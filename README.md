@@ -43,3 +43,8 @@ For the command line above, you should expect the following result:
 | 1          | ATGGAAAG... | 44                               | 14.12923          |
 | 2          | ATAAAATA... | 73                               | 0.20971887        |
 | 3          | 	AGAAGCC... | 73                               | 5.6288967         |
+
+
+## Citation
+
+If you make use of eTIS model and/or this pipeline, please cite:

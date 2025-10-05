@@ -21,13 +21,9 @@ To use a FASTA file instead, simply provide it as the argument to --input.
 > Note that you should replace `pretrained_models/*.pth` with the actual path to the pre-trained models available on this page.
 
 The output is a tab-separated file.
-The first columns should be identical as the ones provided in the dataframe, followed by the length of the sequence `length_sequence` and the predictions in `predictions_GFP`.
+The first columns are identical to those provided in the input dataframe, followed by the sequence length (`length_sequence`) and the predicted GFP levels (`predictions_GFP`).
 
 For the command line above, you should expect the following result:
-id	    	length_sequence	predictions_GFP
-1	ATGGAAAGTAAATGGTAGCTCGGAAGGGTCAAAAGAGTCCGCGG	44	14.12923
-2	ATAAAATAATTTTATTTTATTCAGCTTATAATATGACTCGATGGAGGAAAATTTGATAAGCATGAGAGAAGAC	73	0.20971887
-3	AGAAGCCAGGGACCGGCGGTTCTGGGAGCAGCTGTGCTGGATGCCCTGGAGGAACAAGGAGGCCTCCAGTCCC	73	5.6288967
 
 | sequence    | sequence    | length_sequence                 | prediction_K562   |
 -------------|-------------|----------------------------------|-------------------|

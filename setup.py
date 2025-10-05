@@ -7,7 +7,7 @@ setup(
     include_package_data=True,  # important!
     package_data={
         'eTIS_model': ['pretrained_models/*.pth'],  # include all .pth files
-    }
+    },
     install_requires=[
         "numpy",
         "pandas",

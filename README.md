@@ -28,7 +28,6 @@ To predict GFP levels associated with leaky scanning for each sequence in a tab-
 
 ```sh
 eTIS_model predict \
- --model ./pretrained_models/*.pth \
  --input ./example_data/input.txt \
  --column_sequence sequence \
 --output ./output.txt
@@ -37,7 +36,7 @@ eTIS_model predict \
 To use a FASTA file instead, simply provide it as the argument to --input.
 
 > The argument `--column_sequence` should be the column in your dataframe that includes the sequences to predict.
-> Note that you should replace `pretrained_models/*.pth` with the actual path to the pre-trained models available on this page.
+> Note that you should replace `./example_data/input.txt` with the actual path to the file available on this page.
 
 The output is a tab-separated file.
 The first columns are identical to those provided in the input dataframe, followed by the sequence length (`length_sequence`) and the predicted GFP levels (`predictions_GFP`).

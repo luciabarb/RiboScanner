@@ -5,6 +5,16 @@ eTIS model is a deep learning model that predicts leaky scanning given a 5'UTR s
 
 # Installation
 
+**eTIS_model** can be easily installed with `conda`:
+
+``` conda env create -f ./environment.yml -n eTIS_model```
+
+This will create an environment with **eTIS_model** and all dependencies. Before running, activate the environment with:
+
+```sh
+conda activate eTIS_model
+```
+
 # Usage examples
 
 ### Predicting leaky scanning

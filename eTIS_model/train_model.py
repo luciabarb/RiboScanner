@@ -348,17 +348,9 @@ def main_training(args):
         print(f'\n    - Fold {i_fold}\n', flush=True)
 
         ###########Load model
-        if 'MTtrans' in args.model_architecture:
-
-            model = load_model(args.model_input, model=args.model_architecture, train=True,
-                                freeze_known_weights=args.freeze_known_weights)
+        model = load_model(args.model_input, model=args.model_architecture, train=True)
             
-            #if args.model_input: model = torch.load(args.model_input, 'cpu')['state_dict']
-
-        else: 
-            model = load_model(args.model_input, train=True, L_max=args.L_max, model = args.model_architecture, poisson = args.criterion,
-                            task = args.task, reverse_complement_seq=args.reverse_complement_seq)
-
+        
 
     
 

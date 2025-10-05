@@ -74,7 +74,7 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
     else: return predictions
 
 def predict_from_fasta(input_file, models, L_max, output_file = False,
-                       store_variance=False, padding='left', padding_value=0, batch_size=2000, adaptors=False, verbose=True, header_only=False):
+                       store_variance=False, padding='left', padding_value=0, batch_size=2000, adaptors=False, verbose=False, header_only=False):
     """
     This function will predict the output of a model(s) given a fasta file with sequences.
     Args:
@@ -123,7 +123,7 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
 
 def predict_from_dataframe(input_file, models, column_sequences, L_max, output_file = False, 
                            padding='left', padding_value=0, batch_size=2000, colum_pred_name='predictions_GFP', store_variance=False,
-                           adaptors=False, verbose=True, measurement_column=False, header_only=False):
+                           adaptors=False, verbose=False, measurement_column=False, header_only=False):
     """
     This function will predict the output of a model(s) given a dataframe with sequences.
     Args:
@@ -197,26 +197,8 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
     if output_file is not False: metadata.to_csv(output_file, sep='\t', index=False)
 
 
-    #Make histogram plot of the predictions
-    fig, ax = plt.subplots(figsize=(7, 5))
-    sns.histplot(metadata[colum_pred_name], bins=100, kde=True, ax=ax, color='black')
-    ax.set_xlabel('Predictions')
-    ax.set_ylabel('Frequency')
-    extension_output_file = os.path.splitext(output_file)[0]
-    output_figure = extension_output_file + '_histogram_predictions.png'
-    plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+    
 
-    #If length is in the columns, make another scatter comparing length and predictions
-    if f'length_{column_sequences}' in metadata.columns:
-        fig, ax = plt.subplots(figsize=(7, 5))
-        r2 = np.corrcoef(metadata[f'length_{column_sequences}'], metadata[colum_pred_name])[0, 1]
-        #sns.scatterplot(x=metadata[f'length_{column_sequences}'], y=metadata[colum_pred_name], ax=ax, color='black', linewidth=0,alpha=0.1)
-        sns.jointplot(x=metadata[f'length_{column_sequences}'], y=metadata[colum_pred_name], ax=ax, kind='scatter', color='black', alpha=0.1, marginal_kws=dict(bins=100, fill=True))
-        plt.xlabel(f'Length of {column_sequences}')
-        plt.suptitle(f'Pearson correlation coefficient={r2:.2f}', y=1.05)
-        plt.ylabel('Predictions')
-        output_figure = extension_output_file + '_scatter_length_predictions.png'
-        plt.savefig(output_figure, dpi=300, bbox_inches='tight')
     
     if measurement_column:
         #if it's a measurement column, make a scatter plot of the predictions vs the measurement column

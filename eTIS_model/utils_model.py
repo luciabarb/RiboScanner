@@ -196,8 +196,8 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
 #MODEL FUNCTIONS
 ####################################
 
-def load_model(  pretrained_model_file=None, L_max=50, 
-                    train = True, strict= False, verbose=True, poisson=False):
+def load_model(  pretrained_model_file=None,
+                    train = True, strict= False, verbose=False, model=False):
     """
     Load model depending on the name in the output_directory.
 

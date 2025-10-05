@@ -4,16 +4,6 @@ import torch.nn as nn
 import numpy as np 
 import random
 
-from matplotlib import pyplot as plt, colors
-
-
-#Update parameters
-params = {'legend.fontsize': 'x-large', 'axes.titlesize':'x-large',
-         'axes.linewidth': 2, 'axes.labelsize' : 'x-large',
-         'ytick.major.width': 2, 'ytick.minor.width': 2,
-         'xtick.labelsize':'x-large', 'ytick.labelsize':'x-large'}
-
-plt.rcParams.update(params)
 
 ###DATA PROCESSING
 def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_sequence=False, return_reverse_complement=False, 
@@ -206,8 +196,8 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
 #MODEL FUNCTIONS
 ####################################
 
-def load_model(  pretrained_model_file=None, L_max=50, task = 'regression', 
-                    train = True, strict= False, verbose=True, model='optimus_5_prime', poisson=False, reverse_complement_seq = False):
+def load_model(  pretrained_model_file=None, L_max=50, 
+                    train = True, strict= False, verbose=True, poisson=False):
     """
     Load model depending on the name in the output_directory.
 
@@ -218,20 +208,15 @@ def load_model(  pretrained_model_file=None, L_max=50, task = 'regression',
 
         L_max: (int) max length of sequences
         train: (Boolean) If we are training the model or not.
-        task: (str) Task to perform. If regression, the output is a single value. If classification, the output is a vector with the classes.
         strict: (Boolean) Only relevant if there's pretrained_directory. If weights are paseted in astrict way (it has to be the same exact model) or not.
-        index_interested_output: (False, or int) If several outputs (e.g. several cell lines), we might be interested in only one of them if the model is already trained or
-                                        in training only one of them. If False ignored.
-        freeze_known_weights: (Boolean) If True, the weights that are already known are not updated. If False, all weights are updated.
+        verbose: (Boolean) If we want to print information or not.
 
     Return:
         model: pytorch model with initlaizied weights
     """
 
-    if model == 'leaky_scanning': model = leaky_scanning(L_max=L_max, poisson=poisson, task=task, reverse_complement_seq=reverse_complement_seq)
-    elif model == 'MTtrans': model = MTtrans()
+    model = MTtrans()
               
-    else: raise ValueError(f'Model {model} not recognized')
 
     #Get class name of the model
     model_name = model.__class__.__name__
@@ -287,7 +272,6 @@ class Conv1d_block(nn.Module):
 
         def Conv_block(self, in_chan, out_chan, kernel_size, stride, padding, dilation, activation):
             activation_layer = eval(f"nn.{activation}")
-            print(f'Using activation layer: {activation_layer}', flush=True)
             seq_conv_block = nn.Sequential(
                 nn.Conv1d(in_chan, out_chan, kernel_size, stride, padding, dilation),
                 nn.BatchNorm1d(out_chan),
@@ -335,88 +319,4 @@ class MTtrans(nn.Module):
 
         # Final task-specific output
         out = self.tower[1](h_prim[:, -1, :])
-        return out
-
-class optimus_5_prime(nn.Module):
-
-    def __init__(self, vocab =4, L_max =50, nodes =40, n_blocks =2,
-                 filter_size =120, kernel_size =8, dropout =0.2, 
-                 dropout2 =0.2, dropout3 =0.2, padding='same', poisson=False):
-        super(optimus_5_prime, self).__init__()
-
-
-        #Parameters
-        self.L_max = L_max #all barcodes length
-        self.vocab = vocab #number of nucleotides
-        self.nodes = nodes
-        self.filter_size = filter_size
-        self.kernel_size = kernel_size
-        self.dropout = dropout
-        self.dropout2 = dropout2
-        self.dropout3 = dropout3
-        self.padding = padding
-        dropouts = [self.dropout, self.dropout2, self.dropout3]
-        
-        
-        ##################
-
-        #1- Steam conv
-        self.stem = nn.Sequential(
-            nn.Conv1d(vocab, filter_size, kernel_size = kernel_size, padding = padding),
-            nn.ReLU(inplace=True),
-        )
-
-        #2- Conv tower
-        conv_layers = []
-        for it_block in range(n_blocks):
-            conv_layers.append(nn.Sequential(
-                nn.Conv1d(filter_size, filter_size, kernel_size = kernel_size, padding = padding),
-                nn.ReLU(inplace=True),
-                nn.Dropout(dropouts[it_block])
-            ))
-
-        self.conv_tower = nn.Sequential(*conv_layers)
-
-        #Average layer over the length of the sequence
-        self.avg_layer = nn.AdaptiveAvgPool1d(1)
-
-        ##1st dense layer
-        self.fc1 = nn.Sequential(
-            nn.Linear(filter_size*L_max, nodes),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropouts[-1])
-        )
-
-        #Last dense layer
-        self.fc2 = nn.Linear(nodes, 1)
-
-        if poisson == 'poisson': self.fc2 = nn.Sequential(self.fc2, nn.ReLU())
-        
-
-        #################
-
-    def forward(self, x):
-
-        #1- Steam conv
-        out = self.stem(x)
-        #print(f'out {out}', flush=True)
-        
-        #2- Conv tower
-        out = self.conv_tower(out)
-
-        #Average layer
-        
-        #print(f'out {out}', flush=True)
-        
-        #Flatten
-        out = out.view(out.size(0), -1)
-        #print(f'out {out}', flush=True)
-        
-        #3- Dense layer
-        out = self.fc1(out)
-        #print(f'out {out}', flush=True)
-        #4- Last dense layer
-        out = self.fc2(out)
-        #print(f'out {out}', flush=True)
-
         return out

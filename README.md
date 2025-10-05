@@ -1,10 +1,11 @@
-# eTIS_model
 
 # Introduction
 
+eTIS model is a deep learning model that predicts leaky scanning given a 5'UTR sequence. The sequence should include the putative Translation Initiation Site (TIS) and the surrounding sequence.
+
 # Installation
 
-# Usage examples
+# Predictions - Usage examples
 
 To predict GFP levels associated with leaky scanning for each sequence in a tab-separated dataframe, run:
 

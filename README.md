@@ -14,7 +14,7 @@ eTIS_model predict \
  --model ./pretrained_models/*.pth \ 
  --input ./example_data/input.txt \ 
  --column_sequence sequence \
---output ./example_data/output.txt
+--output ./output.txt
 ```
 
 To use a FASTA file instead, simply provide it as the argument to --input.

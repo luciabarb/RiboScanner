@@ -7,7 +7,7 @@ from .train_model import call_main
 from .version import __version__
 from .misc import check_cuda
 import warnings
-
+import os
 warnings.filterwarnings("ignore")
 
 
@@ -194,12 +194,12 @@ def predict_subparser(subparsers):
 
     required_args = group.add_argument_group("Required arguments")
 
+    default_models = [
+    os.path.join(os.path.dirname(__file__), "pretrained_models", f"model_fold{i}_final.pth")
+    for i in range(9)]
+
     required_args.add_argument( "--model", nargs="+", 
-        default=['./pretrained_models/model_fold9_final.pth', './pretrained_models/model_fold8_final.pth',
-                 './pretrained_models/model_fold7_final.pth', './pretrained_models/model_fold6_final.pth',
-                 './pretrained_models/model_fold5_final.pth', './pretrained_models/model_fold4_final.pth',
-                 './pretrained_models/model_fold3_final.pth', './pretrained_models/model_fold2_final.pth',
-                 './pretrained_models/model_fold1_final.pth', './pretrained_models/model_fold0_final.pth'],
+        default=default_models,
         help="Path(s) to the directory of the model. If you want to perform predictions "
         "for the pre-trained eTIS_models, for instance, this should be "
         "pre_trained_models/eTIS_models/. If you have trained your own model, "

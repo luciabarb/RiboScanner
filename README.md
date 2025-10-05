@@ -28,8 +28,8 @@ To predict GFP levels associated with leaky scanning for each sequence in a tab-
 
 ```sh
 eTIS_model predict \
- --model ./pretrained_models/*.pth \ 
- --input ./example_data/input.txt \ 
+ --model ./pretrained_models/*.pth \
+ --input ./example_data/input.txt \
  --column_sequence sequence \
 --output ./output.txt
 ```

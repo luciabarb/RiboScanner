@@ -16,6 +16,9 @@ Then, you can install directly from GitHub:
 
 ``` pip install git+https://github.com/luciabarb/eTIS_model.git ```
 
+To verify that eTIS_model was installed correctly, run the following command. It should display the help message without errors:
+
+``` eTIS_model --help``` 
 
 # Usage examples
 
@@ -33,6 +36,7 @@ eTIS_model predict \
 
 To use a FASTA file instead, simply provide it as the argument to --input.
 
+> The argument `--column_sequence` should be the column in your dataframe that includes the sequences to predict.
 > Note that you should replace `pretrained_models/*.pth` with the actual path to the pre-trained models available on this page.
 
 The output is a tab-separated file.

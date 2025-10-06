@@ -196,7 +196,7 @@ def predict_subparser(subparsers):
 
     default_models = [
     os.path.join(os.path.dirname(__file__), "pretrained_models", f"model_fold{i}_final.pth")
-    for i in range(9)]
+    for i in range(10)]
 
     required_args.add_argument( "--model", nargs="+", 
         default=default_models,

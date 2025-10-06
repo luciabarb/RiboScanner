@@ -47,9 +47,9 @@ For the command line above, you should expect the following result:
 
 | sequence    | sequence    | length_sequence                 | prediction_K562   |
 -------------|-------------|----------------------------------|-------------------|
-| 1          | ATGGAAAG... | 44                               | 14.12923          |
-| 2          | ATAAAATA... | 73                               | 0.20971887        |
-| 3          | 	AGAAGCC... | 73                               | 5.6288967         |
+| 1          | ATGGAAAG... | 44                               | 14.1292           |
+| 2          | ATAAAATA... | 73                               | 0.2097            |
+| 3          | 	AGAAGCC... | 73                               | 5.6288            |
 
 
 ## Citation

@@ -3,6 +3,8 @@
 
 eTIS model is a deep learning model that predicts leaky scanning given a 5'UTR sequence. The sequence should include the putative Translation Initiation Site (TIS) and the surrounding sequence.
 
+The eTIS model was trained on sequences between 30 bp and 130 bp, so we recommend not exceeding this range.
+
 # Installation
 
 Optionally, create a new environment for **eTIS_model** :

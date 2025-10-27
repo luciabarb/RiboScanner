@@ -45,7 +45,7 @@ The first columns are identical to those provided in the input dataframe, follow
 
 For the command line above, you should expect the following result:
 
-| sequence    | sequence    | length_sequence                 | prediction_GFP   |
+| id         | sequence    | length_sequence                  | predictions_GFP   |
 -------------|-------------|----------------------------------|-------------------|
 | 1          | ATGGAAAG... | 44                               | 14.1292           |
 | 2          | ATAAAATA... | 73                               | 0.2097            |

@@ -44,7 +44,7 @@ def parse_args():
 
     parser.add_argument('--model_input', type = str, default = None, help = 'Path to the model')
     
-    parser.add_argument('--lr', type = float, default = 0.001, help = 'Learning rate')
+    parser.add_argument('--lr', type = float, default = 0.0005, help = 'Learning rate')
     
     parser.add_argument('--batch_size', type = int, default = 32, help = 'Batch size')
     
@@ -58,19 +58,19 @@ def parse_args():
     parser.add_argument('--padding_with_sequence', type = bool, default = False, help = 'If True, the padding will be with a random sequence, otherwise with a value'
                                                                                 ' provided in padding_value, value or random. Bool value, provide True or False')
     
-    parser.add_argument('--L_max', type = int, default = 100, help = 'Max length of the sequence')
+    parser.add_argument('--L_max', type = int, default = 156, help = 'Max length of the sequence')
     
-    parser.add_argument('--epochs', type = int, default = 20, help = 'Number of epochs')
+    parser.add_argument('--epochs', type = int, default = 25, help = 'Number of epochs')
     
     parser.add_argument('--gradient_clipping', type = float, default = False, help = 'Gradient clipping')
     
-    parser.add_argument('--betas',  type=float, nargs='+', default = [0,0], help = 'Regularization terms, L1 and L2 respectively')
+    parser.add_argument('--betas',  type=float, nargs='+', default = [0.05,0.05], help = 'Regularization terms, L1 and L2 respectively')
     
     parser.add_argument('--column_labels', type = str, default = 'mean_GFP', help = 'Column label of the data')
     
     parser.add_argument('--column_sequences', type = str, default = 'Sequence', help = 'Column with the sequences')
     
-    parser.add_argument('--model_architecture', type = str, default = 'leaky_scanning', help = 'Model architecture', choices = ['optimus_5_prime', 'leaky_scanning', 'leaky_scanning_nucleotide_transformer', 'leaky_scanning_UTR_LM', 'MTtrans'])
+    parser.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture', choices = [ 'MTtrans'])
     
     parser.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss', choices = ['mse', 'poisson'])
     

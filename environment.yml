@@ -1,4 +1,4 @@
-name: eTIS_model
+name: RiboScanner
 channels:
   - conda-forge
   - defaults

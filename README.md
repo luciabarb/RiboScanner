@@ -3,24 +3,24 @@
 
 RiboScanner is a deep learning model that predicts leaky scanning given a 5'UTR sequence. The sequence should include the putative Translation Initiation Site (TIS) and the surrounding sequence. The model was trained on HEK293 cell data.
 
-The eTIS model was trained on sequences between 30 bp and 130 bp, so we recommend not exceeding this range. Since most of the training sequences contain only one AUG, we also suggest including only one AUG per input sequence. Additionally, most sequences seen by the model contain 17 nucleotides downstream of the AUG.
+The RiboScanner was trained on sequences between 30 bp and 130 bp, so we recommend not exceeding this range. Since most of the training sequences contain only one AUG, we also suggest including only one AUG per input sequence. Additionally, most sequences seen by the model contain 17 nucleotides downstream of the AUG.
 
 # Installation
 
-Optionally, create a new environment for **eTIS_model** :
+Optionally, create a new environment for **RiboScanner** :
 
 ```
-conda create -n eTIS_model python=3.9
-conda activate eTIS_model
+conda create -n RiboScanner python=3.9
+conda activate RiboScanner
 ```
 
 Then, you can install directly from GitHub:
 
-``` pip install git+https://github.com/luciabarb/eTIS_model.git ```
+``` pip install git+https://github.com/luciabarb/RiboScanner.git ```
 
-To verify that eTIS_model was installed correctly, run the following command. It should display the help message without errors:
+To verify that RiboScanner was installed correctly, run the following command. It should display the help message without errors:
 
-``` eTIS_model --help``` 
+``` RiboScanner --help``` 
 
 # Usage examples
 
@@ -29,7 +29,7 @@ To verify that eTIS_model was installed correctly, run the following command. It
 To predict GFP levels associated with leaky scanning for each sequence in a tab-separated dataframe, run:
 
 ```sh
-eTIS_model predict \
+RiboScanner predict \
  --input ./example_data/input.txt \
  --column_sequence sequence \
 --output ./output.txt

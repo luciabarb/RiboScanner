@@ -18,9 +18,9 @@ def log(message: str):
     Examples
     --------
     >>> log("This is a message")
-    [PARM v0.1.0] This is a message
+    [RiboScanner v0.1.0] This is a message
     """
-    v = 'PARM v' + __version__
+    v = 'RiboScanner v' + __version__
     print(f"[{v}] {message}", flush=True)
     
 

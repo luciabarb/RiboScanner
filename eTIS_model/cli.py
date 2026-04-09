@@ -53,7 +53,7 @@ def main():
     other_args.add_argument(
         "--version",
         action="version",
-        version="PARM v" + __version__,
+        version="RiboScanner v" + __version__,
         help="Show program's version number and exit",
     )
     args = parser.parse_args()
@@ -81,7 +81,7 @@ def train_subparser(subparsers):
 
     group = subparsers.add_parser(
         "train",
-        help="Train a new eTIS model from pre-processed data",
+        help="Train a new RiboScanner model from pre-processed data",
         formatter_class=MyHelpFormatter,
         add_help=False,
         description="R|" + description,
@@ -184,7 +184,7 @@ def predict_subparser(subparsers):
 
     group = subparsers.add_parser(
         "predict",
-        help="Predict promoter activity of sequences in data frame or fasta file using a trained eTIS model. "
+        help="Predict promoter activity of sequences in data frame or fasta file using a trained RiboScanner model. "
         "model. The output is a tab-separated file with the sequence and the "
         "predicted score.",
         formatter_class=MyHelpFormatter,
@@ -201,8 +201,8 @@ def predict_subparser(subparsers):
     required_args.add_argument( "--model", nargs="+", 
         default=default_models,
         help="Path(s) to the directory of the model. If you want to perform predictions "
-        "for the pre-trained eTIS_models, for instance, this should be "
-        "pre_trained_models/eTIS_models/. If you have trained your own model, "
+        "for the pre-trained RiboScanner_models, for instance, this should be "
+        "pre_trained_models/RiboScanner_models/. If you have trained your own model, "
         "you should pass the path to the directory where the .pth files are stored. ",
     )
 
@@ -223,7 +223,7 @@ def predict_subparser(subparsers):
     required_args.add_argument(
         "--header_only",  action = argparse.BooleanOptionalAction, default=False,
         help="If this flag is set, the output file will not contain the sequences of the\n"
-                " input fasta. By default, eTIS model shows both the sequence and the header. (Default: False)"
+                " input fasta. By default, RiboScanner model shows both the sequence and the header. (Default: False)"
     )
 
     ##########
@@ -245,7 +245,7 @@ def predict_subparser(subparsers):
     other_args.add_argument(
         "--version",
         action="version",
-        version="eTIS model v" + __version__,
+        version="RiboScanner model v" + __version__,
         help="Show program's version number and exit",
     )
 
@@ -307,7 +307,7 @@ def predict(args):
 def bye_message():
     return (
         "\nAll done!\n"
-        "If you make use of eTIS model in your research, please cite:\n\n"
+        "If you make use of RiboScanner model in your research, please cite:\n\n"
         "  #### et. al. (2026) \n"
         "   \n"
         "  bioRXiv. ###\n"

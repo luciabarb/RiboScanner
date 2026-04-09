@@ -61,4 +61,4 @@ For the command line above, you should expect the following result:
 
 ## Citation
 
-If you make use of eTIS model and/or this pipeline, please cite:
+If you make use of RiboScanner model and/or this pipeline, please cite:

@@ -3,6 +3,9 @@
 
 RiboScanner is a deep learning model that predicts leaky scanning given a 5'UTR sequence. The sequence should include the putative Translation Initiation Site (TIS) and the surrounding sequence. The model was trained on HEK293 cell data.
 
+<img width="1519" height="836" alt="draft_figure_github_RiboScanner" src="https://github.com/user-attachments/assets/049bfa5c-67a7-4e68-a3c5-317b834cc033" />
+
+
 The RiboScanner was trained on sequences between 30 bp and 130 bp, so we recommend not exceeding this range. Since most of the training sequences contain only one AUG, we also suggest including only one AUG per input sequence. Additionally, most sequences seen by the model contain 17 nucleotides downstream of the AUG.
 
 # Installation

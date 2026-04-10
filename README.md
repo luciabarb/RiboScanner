@@ -62,3 +62,6 @@ For the command line above, you should expect the following result:
 ## Citation
 
 If you make use of RiboScanner model and/or this pipeline, please cite:
+
+
+Bram M. P. Verhagen, David Liedtke, Lucía Barbadilla-Martínez, Carlos Alvarado, Valentyn Petrychenko, Michał Świrski, Micha D. Müller, Eivind Valen, Joseph D. Puglisi, Jeroen de Ridder, Niels Fischer and Marvin E. Tanenbaum. "Decoding the sequence requirements for translation initiation." (2026)

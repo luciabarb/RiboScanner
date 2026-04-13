@@ -299,7 +299,7 @@ def plot_pred_vs_true(y_true, y_val, output_folder, title, column_labels):
     ax.set_ylabel(f'Prediction: {column_labels}')
 
 
-    plt.savefig(os.path.join(output_folder, f'LB{today}_{title}.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(output_folder, f'{today}_{title}.png'), bbox_inches='tight')
 
     print(f'        - {title},r = {rvalue}, {pvalue}', flush=True)
 
@@ -317,7 +317,7 @@ def final_bar_plot(data, output_folder, today):
     sns.stripplot(ax=ax, x="Set", y="Pearson correlation coefficient", data=data, jitter=True, color="black")
     
     plt.ylim(0, ax.get_ylim()[1]*1.1)
-    plt.savefig(os.path.join(output_folder, f'LB{today}_correlation_folds.png'), bbox_inches='tight')
+    plt.savefig(os.path.join(output_folder, f'{today}_correlation_folds.png'), bbox_inches='tight')
 
 def plot_loss(epoch, loss_training, loss_validation, output_folder, i_fold, today):
     fig, ax = plt.subplots()
@@ -326,7 +326,7 @@ def plot_loss(epoch, loss_training, loss_validation, output_folder, i_fold, toda
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
     plt.legend(frameon=False)
-    plt.savefig(os.path.join(output_folder, f'LB{today}_{i_fold}_loss.png'))
+    plt.savefig(os.path.join(output_folder, f'{today}_{i_fold}_loss.png'))
 
 #main function
 def main_training(args):
@@ -454,7 +454,7 @@ def main_training(args):
             #Save model and plot predictionss
             epochs_to_motif = range(0, args.epochs+1, args.epochs//10)
             if epoch in epochs_to_motif or epoch == (args.epochs-1):
-                torch.save(model.state_dict(), os.path.join(output_folder, f'LB{today}_model_fold{i_fold}_epoch_{epoch}.pth'))
+                torch.save(model.state_dict(), os.path.join(output_folder, f'{today}_model_fold{i_fold}_epoch_{epoch}.pth'))
                 rvalue_train, pvalue = plot_pred_vs_true(y_train_true, y_train_predicted, output_folder, title=f'Training_fold{i_fold}_epoch{epoch}', column_labels= args.column_labels)
                 rvalue_val, pvalue = plot_pred_vs_true(y_val_real, y_val_predicted, output_folder, title=f'Validation_fold{i_fold}_epoch{epoch}', column_labels= args.column_labels)
 

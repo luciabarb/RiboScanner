@@ -24,6 +24,7 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
     # Define nucleotide to vector
     letter2vector = {'A':np.array([1.,0.,0.,0.]),'C':np.array([0.,1.,0.,0.]),
                      'G':np.array([0.,0.,1.,0.]),'T':np.array([0.,0.,0.,1.]),
+                     'U':np.array([0.,0.,0.,1.]),
                      'N':np.array([0.,0.,0.,0.])};
 
 
@@ -58,24 +59,24 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
             if padding == 'random':
                 left_random = random.randint(0,diff)
                 right_random = diff - left_random
-                seq_left = ''.join(random.choices(['A','C','G','T'], k=left_random))
-                seq_right = ''.join(random.choices(['A','C','G','T'], k=right_random))
+                seq_left = ''.join(random.choices(['A','C','G','U'], k=left_random))
+                seq_right = ''.join(random.choices(['A','C','G','U'], k=right_random))
                 seq = seq_left + seq + seq_right
                 diff, pw = 0, 0
 
             elif padding == 'middle':
-                seq_left = ''.join(random.choices(['A','C','G','T'], k=int(np.ceil(pw))))
-                seq_right = ''.join(random.choices(['A','C','G','T'], k=int(np.floor(pw))))
+                seq_left = ''.join(random.choices(['A','C','G','U'], k=int(np.ceil(pw))))
+                seq_right = ''.join(random.choices(['A','C','G','U'], k=int(np.floor(pw))))
                 seq = seq_left + seq + seq_right
                 diff, pw = 0, 0
             
             elif padding == 'left':
-                seq_right = ''.join(random.choices(['A','C','G','T'], k=diff))
+                seq_right = ''.join(random.choices(['A','C','G','U'], k=diff))
                 seq = seq + seq_right
                 diff, pw = 0, 0
             
             elif padding == 'right':
-                seq_left = ''.join(random.choices(['A','C','G','T'], k=diff))
+                seq_left = ''.join(random.choices(['A','C','G','U'], k=diff))
                 seq = seq_left + seq
                 diff, pw = 0, 0
 

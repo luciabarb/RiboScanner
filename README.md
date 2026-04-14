@@ -5,7 +5,7 @@ RiboScanner is a deep learning model that given a 5'UTR sequence, predicts leaky
 
 
 
-<img width="1573" height="897" alt="draft_figure_github_RiboScanner_v2" src="https://github.com/user-attachments/assets/470dbd13-eeb1-469f-939f-d0ca46dad1cc" />
+<img width="1573" height="897" alt="draft_figure_github_RiboScanner_v2" src="https://github.com/user-attachments/assets/e244cdad-5733-466f-9923-edb52e228d38" />
 
 
 

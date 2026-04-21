@@ -315,7 +315,7 @@ def bye_message():
         "\nAll done!\n"
         "If you make use of RiboScanner model in your research, please cite:\n\n"
         "  Bram M. P. Verhagen, David Liedtke, Lucía Barbadilla-Martínez et. al. \n"
-        " "Decoding the sequence requirements for translation initiation." (2026) \n"
+        " Decoding the sequence requirements for translation initiation. (2026) \n"
         "   \n"
         "  bioRXiv. ###\n"
         "\n"

@@ -44,7 +44,7 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
     if verbose:
         batches_loader = tqdm(batches, total = len(batches), ncols=80)
     else: batches_loader = batches
-
+    
     for batch in batches_loader:
         pred_models = []
         if variance_models: var_models = []
@@ -105,7 +105,7 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
         if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
         loaded_model.eval()
         loaded_models_list.append(loaded_model)
-    print(f'Number of models loaded: {len(loaded_models_list)}', flush=True)
+    print(f'Number of models loadded: {len(loaded_models_list)}', flush=True)
 
     #Predict
     #Predict
@@ -179,7 +179,7 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
         if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
         loaded_model.eval()
         loaded_models_list.append(loaded_model)
-    print(f'Number of models loaded: {len(loaded_models_list)}', flush=True)
+    print(f'Number of models loadded: {len(loaded_models_list)}', flush=True)
     #Predict
     if store_variance: 
         predictions, variances = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, 

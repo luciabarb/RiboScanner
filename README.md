@@ -54,9 +54,9 @@ For the command line above, you should expect the following result:
 
 | id         | sequence    | length_sequence                  | predictions_GFP   |
 -------------|-------------|----------------------------------|-------------------|
-| 1          | ATGGAAAG... | 44                               | 10.5568905        |
-| 2          | ATAAAATA... | 73                               | -0.11366899       |
-| 3          | 	AGAAGCC... | 73                               | 5.800055          |
+| 1          | ATGGAAAG... | 44                               | 11.863073         |
+| 2          | ATAAAATA... | 73                               | -0.10921967       |
+| 3          | 	AGAAGCC... | 73                               | 6.5084333         |
 
 
 ## Citation

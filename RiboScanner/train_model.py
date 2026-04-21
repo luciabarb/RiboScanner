@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt, colors
 import matplotlib as mpl
 
 from .utils_model import load_model, dataset_batch_onehot
+from .utils_external_models import adapted_GemoRNA
 
 params_figs = {'legend.fontsize': 'x-large',
          'axes.titlesize':'x-large',
@@ -70,7 +71,7 @@ def parse_args():
     
     parser.add_argument('--column_sequences', type = str, default = 'Sequence', help = 'Column with the sequences')
     
-    parser.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture', choices = [ 'MTtrans'])
+    parser.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture', choices = [ 'MTtrans', 'GemoRNA'])
     
     parser.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss', choices = ['mse', 'poisson'])
     

@@ -1,0 +1,2 @@
+[console_scripts]
+RiboScanner = RiboScanner.cli:main

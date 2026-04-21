@@ -210,12 +210,20 @@ def load_model(  pretrained_model_file=None,
         train: (Boolean) If we are training the model or not.
         strict: (Boolean) Only relevant if there's pretrained_directory. If weights are paseted in astrict way (it has to be the same exact model) or not.
         verbose: (Boolean) If we want to print information or not.
+        model: (str) Model architecture to use. (default: MTtrans)
 
     Return:
         model: pytorch model with initlaizied weights
     """
 
-    model = MTtrans()
+    if model == 'MTtrans': 
+        model = MTtrans()
+
+    elif model == 'GemoRNA': 
+        from utils_external_models import adapted_GemoRNA
+        model = adapted_GemoRNA(n_embd=144, n_head=12, dropout=0.1, bias=True, block_size=768, num_classes=1, n_layer=12, vocab_size=512) #n_layer, n_head can change
+    
+    else: raise ValueError(f'Model architecture not recognised: {model}')
               
 
     #Get class name of the model
@@ -230,7 +238,19 @@ def load_model(  pretrained_model_file=None,
             
             model_weights = torch.load(pretrained_model_file, map_location=torch.device('cpu'))
             
-            missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = strict)
+            if 'GemoRNA' in model_name and '.pth' in pretrained_model_file:
+                #from .pretrained_models.GEMORNA import config
+                #model_weights = torch.load(pretrained_model_file,  weights_only=False)['model']
+        
+                missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = False)
+                #For the matching weights, we load them and freeze them, for the non-matching weights, we keep them as they are and they will be trained
+                for name, param in model.named_parameters():
+                    if name in model_weights:
+                        print(f'      Loading weight {name} from pretrained model and freezing it', flush=True)
+                        param.requires_grad = False
+
+            else:
+                missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = strict)
             
 
             if verbose: print(f'      Missing keys {missing_keys}, \n      Unexpected keys {unexpected_keys}', flush=True)
@@ -320,3 +340,4 @@ class MTtrans(nn.Module):
         # Final task-specific output
         out = self.tower[1](h_prim[:, -1, :])
         return out
+

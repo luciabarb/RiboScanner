@@ -31,8 +31,13 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
         variance_models: (bool) If true, store variance of the models and return it
     """
 
+
+    #print(f'Models {models}  {type(models)}', flush=True)
+
     if type(models) != list: models = [models]
     if type(seqs) != list: seqs = [seqs]
+
+    #print(f'Models {models} n_models {len(models)}', flush=True)
 
     #Split the sequences in batches
     batches = [seqs[i:i+batch_size] for i in range(0, len(seqs), batch_size)]
@@ -52,7 +57,8 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
         onehot = onehot.permute(0,2,1)
         if torch.cuda.is_available(): onehot = onehot.cuda()
         #Now loop over the models
-        for model in models:
+        for i_model, model in enumerate(models):
+            #print(f'Model {i_model}: {type(model)}', flush=True)
             model.eval()
             with torch.no_grad():
                 outputs = model(onehot).cpu().detach().numpy()
@@ -111,7 +117,7 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
                                                 padding_value=padding_value, batch_size=batch_size, 
                                                 variance_models = store_variance, adaptors=adaptors)
     else: 
-        predictions = predict_from_seq(loaded_model, seqs, L_max, padding=padding, padding_value=padding_value, 
+        predictions = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, padding_value=padding_value, 
                                        batch_size=batch_size, variance_models = store_variance, adaptors=adaptors)
     
     #Return a dataframe with the headers and the predictions
@@ -183,7 +189,7 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
                                                 padding_value=padding_value, batch_size=batch_size, 
                                                 variance_models = store_variance, adaptors=adaptors)
     else: 
-        predictions = predict_from_seq(loaded_model, seqs, L_max, padding=padding, padding_value=padding_value, 
+        predictions = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, padding_value=padding_value, 
                                        batch_size=batch_size, variance_models = store_variance, adaptors=adaptors)
 
     #Print the shape

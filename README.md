@@ -1,4 +1,4 @@
-<img width="1840" height="739" alt="logo_riboscanner_text_v4" src="https://github.com/user-attachments/assets/fdbe4002-11f4-4a7e-9cf5-989f707cc5f6" />
+<img width="1934" height="823" alt="logo_riboscanner_text_v6" src="https://github.com/user-attachments/assets/fa3aa64a-d9b6-4088-8cce-85ff563513dc" />
 
 
 

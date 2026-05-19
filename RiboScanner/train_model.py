@@ -339,7 +339,7 @@ def main_training(args):
         
 
     #Make all possible combinations of the file where one is the validation and the rest the training
-    files_training = args.input_train_data
+    files_training = args.input_data
 
     corr_fold_train, corr_fold_valid = [], []
 

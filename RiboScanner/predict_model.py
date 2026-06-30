@@ -19,7 +19,7 @@ plt.rcParams.update(params)
 
 
 def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch_size=2000, 
-                        variance_models = False, adaptors=False):
+                        variance_models = False, adaptors=False, model_type='MTtrans'):
     """
     This function will predict the output of a model(s) given a list of sequences.
     Args:
@@ -51,10 +51,19 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
         pred_models = []
         if variance_models: var_models = []
         #Transform the sequences to one hot
-        onehot = getOneHot(batch, L_max, padding = padding, padding_value=padding_value, adaptors=adaptors)
-        #Transform to tensor and to gpus if available
-        onehot = torch.tensor(np.float32(onehot))
-        onehot = onehot.permute(0,2,1)
+
+        if model_type == 'GemoRNA':
+            from .utils_external_models import prepare_input
+            from .utils_external_models import five_prime_utr_vocab
+            onehot = prepare_input(batch, vocab = five_prime_utr_vocab, pad_to=L_max)
+            onehot = torch.tensor(onehot)
+        
+        else: 
+            onehot = getOneHot(batch, L_max, padding = padding, padding_value=padding_value, adaptors=adaptors,
+                                        relative_to_start_codon = True if model_type == 'dense_layers' else False)
+            #Transform to tensor and to gpus if available
+            onehot = torch.tensor(np.float32(onehot))
+            onehot = onehot.permute(0,2,1)
         if torch.cuda.is_available(): onehot = onehot.cuda()
         #Now loop over the models
         for i_model, model in enumerate(models):
@@ -80,7 +89,8 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
     else: return predictions
 
 def predict_from_fasta(input_file, models, L_max, output_file = False,
-                       store_variance=False, padding='left', padding_value=0, batch_size=2000, adaptors=False, verbose=False, header_only=False):
+                       store_variance=False, padding='left', padding_value=0, batch_size=2000, adaptors=False, verbose=False, header_only=False,
+                       model_type='MTtrans'):
     """
     This function will predict the output of a model(s) given a fasta file with sequences.
     Args:
@@ -104,21 +114,21 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
     #Load each model
     loaded_models_list = []
     for model in models:
-        loaded_model = load_model(model, model='MTtrans', train=True, verbose=verbose)
+        loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max)
         if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
         loaded_model.eval()
         loaded_models_list.append(loaded_model)
-    print(f'Number of models loadded: {len(loaded_models_list)}', flush=True)
+    print(f'Number of models loaded: {len(loaded_models_list)}', flush=True)
 
     #Predict
     #Predict
     if store_variance: 
         predictions, variances = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, 
                                                 padding_value=padding_value, batch_size=batch_size, 
-                                                variance_models = store_variance, adaptors=adaptors)
+                                                variance_models = store_variance, adaptors=adaptors, model_type=model_type)
     else: 
         predictions = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, padding_value=padding_value, 
-                                       batch_size=batch_size, variance_models = store_variance, adaptors=adaptors)
+                                       batch_size=batch_size, variance_models = store_variance, adaptors=adaptors, model_type=model_type)
     
     #Return a dataframe with the headers and the predictions
     if header_only:df = pd.DataFrame({'header': headers, 'predictions': predictions.flatten()})
@@ -129,7 +139,8 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
 
 def predict_from_dataframe(input_file, models, column_sequences, L_max, output_file = False, 
                            padding='left', padding_value=0, batch_size=2000, colum_pred_name='predictions_GFP', store_variance=False,
-                           adaptors=False, verbose=False, measurement_column=False, header_only=False):
+                           adaptors=False, verbose=False, measurement_column=False, header_only=False, split_on_variable=False,
+                           model_type='MTtrans'):
     """
     This function will predict the output of a model(s) given a dataframe with sequences.
     Args:
@@ -143,6 +154,8 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
         store_variance: (bool) If true, store variance of the models and return it
 
     """
+
+    #print(f'Predicting from dataframe {input_file} using models {models} with model type {model_type}...', flush=True)
 
     #Create folder of output file if it doesn't exist
     if output_file is not False:
@@ -178,7 +191,7 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
     #Load each model
     loaded_models_list = []
     for model in models:
-        loaded_model = load_model(model, model='MTtrans', train=True, verbose=verbose)
+        loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max)
         if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
         loaded_model.eval()
         loaded_models_list.append(loaded_model)
@@ -187,10 +200,10 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
     if store_variance: 
         predictions, variances = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, 
                                                 padding_value=padding_value, batch_size=batch_size, 
-                                                variance_models = store_variance, adaptors=adaptors)
+                                                variance_models = store_variance, adaptors=adaptors, model_type=model_type)
     else: 
         predictions = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, padding_value=padding_value, 
-                                       batch_size=batch_size, variance_models = store_variance, adaptors=adaptors)
+                                       batch_size=batch_size, variance_models = store_variance, adaptors=adaptors, model_type=model_type)
 
     #Print the shape
     metadata[colum_pred_name] = predictions
@@ -207,13 +220,14 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
 
     
     if measurement_column:
+        extension_output_file = os.path.splitext(output_file)[0]
         #if it's a measurement column, make a scatter plot of the predictions vs the measurement column
         if measurement_column in metadata.columns:
             fig, ax = plt.subplots(figsize=(7, 5))
 
                 
             r2 = np.corrcoef(metadata[measurement_column], metadata[colum_pred_name])[0, 1]
-            if 'Variant' in metadata.columns:
+            if False: #'Variant' in metadata.columns:
                 metadata['Type'] = metadata['Variant'].fillna('').apply(lambda x: x.split('_')[-2])
                 sns.scatterplot(x=metadata[measurement_column], y=metadata[colum_pred_name], ax=ax, 
                              linewidth=0, alpha=1, hue=metadata['Type'], palette='Set1', s=50)
@@ -236,6 +250,117 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
             ax.set_ylabel(f'Measurement {measurement_column}')
             output_figure = extension_output_file + '_hist2d_predictions.png'
             plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+        
+
+            #Now check if the split_on_variable exists, and if so, check if it's in the metadata, and if so, make a scatter plot of the predictions vs the measurement but make column=5 and rows the remaining
+            if split_on_variable and split_on_variable in metadata.columns:
+                #Take only the unique values that have at least 10 values
+                metadata_filtered = metadata.groupby(split_on_variable).filter(lambda x: len(x) >= 10)
+                unique_values = metadata_filtered[split_on_variable].unique()
+                #Order the unique values by the variance of the measurement column
+                unique_values = sorted(unique_values, key=lambda x: metadata[metadata[split_on_variable] == x][measurement_column].var())
+                #Reverse
+                unique_values = unique_values[::-1]
+                n_cols = 5 if len(unique_values) < 20 else 10
+                n_rows = int(np.ceil(len(unique_values) / n_cols))
+
+                size_fig_row = np.max([30, 5*n_rows])
+                
+                fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols*5, size_fig_row), sharex=True, sharey=True)
+                axes = axes.flatten()
+                corr_var = {}
+                for i, value in enumerate(unique_values):
+                    subset = metadata[metadata[split_on_variable] == value]
+                    r2_subset = np.corrcoef(subset[measurement_column], subset[colum_pred_name])[0, 1]
+                    var_measurement = subset[measurement_column].var()
+                    sns.scatterplot(x=subset[measurement_column], y=subset[colum_pred_name], ax=axes[i],
+                                    linewidth=0, alpha=1, color='black', s=50)
+                    axes[i].set_title(f'{split_on_variable}={value}, n={len(subset)}\n Measurements Var.={var_measurement:.2f}, Pearson r={r2_subset:.2f}')
+                    axes[i].set_xlabel(f'Measurement {measurement_column}')
+                    axes[i].set_ylabel('Predicted GFP scores')
+                    corr_var[value] = {'r2': r2_subset, 'var_measurement': var_measurement}
+                plt.tight_layout()
+                output_figure = extension_output_file + f'_scatter_{measurement_column}_vs_predictions_split_by_{split_on_variable}.png'
+                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+
+                #Save the correlation and variance in a csv file
+                corr_var_df = pd.DataFrame.from_dict(corr_var, orient='index')
+                #Index to column
+                corr_var_df = corr_var_df.reset_index().rename(columns={'index': split_on_variable})
+                output_corr_var = extension_output_file + f'_correlation_variance_split_by_{split_on_variable}.txt'
+                corr_var_df.to_csv(output_corr_var, sep='\t', index=False)
+
+                #Make a barplot of all the correlations with the TIS in the x axis and the correlation in the y axis
+                #Make a heatmap on top but that it's way smaller in the y-axis (i.e. 2)
+                fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(max(20, len(unique_values)*0.5), 8), gridspec_kw={'height_ratios': [1, 5]})
+                sns.barplot(x=split_on_variable, y='r2', data=corr_var_df, ax=ax[1], color='lightgray')
+                #Rotate x ticks
+                ax[1].set_xticklabels(ax[1].get_xticklabels(), rotation=90)
+                ax[1].set_ylabel(f'PCC measurements vs predictions \n within sequences with the same {split_on_variable}')
+                ax[1].set_xlabel(f'{split_on_variable}')
+                #ax[1].set_title(f'Correlation between predicted GFP scores and measurements split by {split_on_variable}')
+                #Put the correlation value on top of each bar
+                for i, row in corr_var_df.iterrows():
+                    n = metadata[metadata[split_on_variable] == row[split_on_variable]].shape[0]
+                    ax[1].text(i, row['r2']*0.98, f"{row['r2']:.2f},\nn={n}", ha='center', va='bottom', fontsize=10)
+
+                #Add on top a heatmap that indicates 1) the number of sequences and 2) the variance of the measurements for each split_on_variable value
+                #Create a new axis on top of the barplot
+                ax2 = ax[0]
+                sns.heatmap(corr_var_df[['var_measurement']].T, ax=ax2, cmap='Reds', cbar=False, alpha=0.5, annot=corr_var_df[['var_measurement']].T, 
+                                fmt='.1f', annot_kws={'fontsize': 10})
+                ax2.set_xlabel('')
+                #Remove x ticks
+                ax2.set_xticks([])
+                ax2.set_yticks([])
+                ax2.set_ylabel('Measurement\n variance')
+
+                plt.tight_layout()
+                
+
+                output_figure = extension_output_file + f'_barplot_correlation_split_by_{split_on_variable}.png'
+                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+
+
+                #Make also histogram of the correlation values
+                fig, ax = plt.subplots(figsize=(7, 5))
+                sns.histplot(corr_var_df['r2'], bins=20, ax=ax, color='lightgray', edgecolor='black')
+                ax.set_xlabel(f'PCC measurements vs predictions \n within sequences with same {split_on_variable}')
+                ax.set_ylabel('Count')
+                average = corr_var_df['r2'].mean()
+                #Put a line at the average value
+                ax.axvline(average, color='red', linestyle='--', label=f'Average PCC={average:.2f}')
+                ax.legend(frameon=False, bbox_to_anchor=(1, 1))
+                ax.set_title(f'Histogram of correlation values \n split by {split_on_variable}')
+                plt.tight_layout()
+                output_figure = extension_output_file + f'_histogram_correlation_split_by_{split_on_variable}.png'
+                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+
+                #Make a regression plot of the correlation vs the variance of the measurements
+                fig, ax = plt.subplots(figsize=(7, 5))
+                #Make line red and dots black
+                sns.regplot(x='var_measurement', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
+                ax.set_xlabel(f'Variance of measurements \n within sequences with same {split_on_variable}')
+                ax.set_ylabel(f'PCC measurements vs predictions \n within sequences with same {split_on_variable}')
+                ax.set_title(f'Correlation between measurement variance and correlation with predictions \n split by {split_on_variable}')
+                r2 = np.corrcoef(corr_var_df['var_measurement'], corr_var_df['r2'])[0, 1]
+                ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
+                plt.tight_layout()
+                output_figure = extension_output_file + f'_correlation_measurement_variance_split_by_{split_on_variable}.png'
+                plt.savefig(output_figure, dpi=300, bbox_inches='tight')    
+
+                #Now do the same by number of sequences
+                fig, ax = plt.subplots(figsize=(7, 5))
+                corr_var_df['n_sequences'] = corr_var_df[split_on_variable].apply(lambda x: metadata[metadata[split_on_variable] == x].shape[0])
+                sns.regplot(x='n_sequences', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
+                ax.set_xlabel(f'Number of sequences \n with same {split_on_variable}')
+                ax.set_ylabel(f'PCC measurements vs predictions \n within sequences with same {split_on_variable}')
+                ax.set_title(f'Correlation between number of sequences and correlation with predictions \n split by {split_on_variable}')
+                r2 = np.corrcoef(corr_var_df['n_sequences'], corr_var_df['r2'])[0, 1]
+                ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
+                plt.tight_layout()
+                output_figure = extension_output_file + f'_correlation_number_sequences_split_by_{split_on_variable}.png'
+                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
 
     return metadata
 

@@ -20,7 +20,6 @@ from matplotlib import pyplot as plt, colors
 import matplotlib as mpl
 
 from .utils_model import load_model, dataset_batch_onehot
-from .utils_external_models import adapted_GemoRNA
 
 params_figs = {'legend.fontsize': 'x-large',
          'axes.titlesize':'x-large',
@@ -71,7 +70,7 @@ def parse_args():
     
     parser.add_argument('--column_sequences', type = str, default = 'Sequence', help = 'Column with the sequences')
     
-    parser.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture', choices = [ 'MTtrans', 'GemoRNA'])
+    parser.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture', choices = [ 'MTtrans', 'GemoRNA', 'dense_layers'])
     
     parser.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss', choices = ['mse', 'poisson'])
     
@@ -120,11 +119,16 @@ def training_step(train_dataloader, model, criterion, optimizer, scheduler=False
     #Loop through baches
     for batch_ndx, (X) in tqdm(enumerate(train_dataloader), total= len(train_dataloader), ncols=100):
         optimizer.zero_grad()
+
             
         X, y = X[0], X[1]
-        dims = list(range(len(X.shape)))
-        dims[-1], dims[-2] = dims[-2], dims[-1]
-        X = X.permute(*dims)
+
+        #If X has more than 2 dimensions
+        if len(X.shape) > 2:
+            dims = list(range(len(X.shape)))
+            dims[-1], dims[-2] = dims[-2], dims[-1]
+            X = X.permute(*dims)
+                
         y = y.unsqueeze(1)
         
 
@@ -170,9 +174,6 @@ def training_step(train_dataloader, model, criterion, optimizer, scheduler=False
         if scheduler: scheduler.step() #If there's an scheduler, the learning rate need to be optimized
 
         
-            
-
-
         #Print results so far, only ten batches per epoch
         batch_to_print = range(0, total_number_batches+1, total_number_batches//50)
         if batch_ndx in batch_to_print:
@@ -220,11 +221,13 @@ def evaluation_step(valid_dataloader, model, criterion, optimizer, type_data='Va
 
     with torch.no_grad():
         for batch_ndx, (X) in tqdm(enumerate(valid_dataloader), total= len(valid_dataloader), ncols=100):
-            
             X, y = X[0], X[1]
-            dims = list(range(len(X.shape)))
-            dims[-1], dims[-2] = dims[-2], dims[-1]
-            X = X.permute(*dims)
+
+            #If X has more than 2 dimensions
+            if len(X.shape) > 2:
+                dims = list(range(len(X.shape)))
+                dims[-1], dims[-2] = dims[-2], dims[-1]
+                X = X.permute(*dims)
             #X = X.permute(0,2,1)
             y = y.unsqueeze(1)
 
@@ -322,8 +325,8 @@ def final_bar_plot(data, output_folder, today):
 
 def plot_loss(epoch, loss_training, loss_validation, output_folder, i_fold, today):
     fig, ax = plt.subplots()
-    ax.plot(range(epoch), loss_training, label = 'Training')
-    ax.plot(range(epoch), loss_validation, label = 'Validation')
+    ax.plot(list(range(epoch)), loss_training, label = 'Training')
+    ax.plot(list(range(epoch)), loss_validation, label = 'Validation')
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
     plt.legend(frameon=False)
@@ -337,10 +340,10 @@ def main_training(args):
     if args.criterion == 'mse': criterion = torch.nn.MSELoss()
     elif args.criterion == 'poisson': criterion = torch.nn.PoissonNLLLoss(log_input=False)
 
-        
+    output_folder = args.output_folder
 
     #Make all possible combinations of the file where one is the validation and the rest the training
-    files_training = args.input_train_data
+    files_training = args.input_data
 
     corr_fold_train, corr_fold_valid = [], []
 
@@ -349,7 +352,7 @@ def main_training(args):
         print(f'\n    - Fold {i_fold}\n', flush=True)
 
         ###########Load model
-        model = load_model(args.model_input, model=args.model_architecture, train=True)
+        model = load_model(args.model_input, model=args.model_architecture, train=True, L_max=args.L_max)
             
         
 
@@ -392,10 +395,11 @@ def main_training(args):
 
         training_set = dataset_batch_onehot(train_data, args.column_labels, args.column_sequences, L_max = args.L_max, padding = args.type_padding, 
                                                     padding_value=args.padding_value, padding_with_sequence = args.padding_with_sequence, 
-                                                    reverse_complement_seq=args.reverse_complement_seq, adaptors=args.adaptors)
+                                                     adaptors=args.adaptors, type_model = args.model_architecture)
+                                                     
         validation_set = dataset_batch_onehot(val_data, args.column_labels, args.column_sequences, L_max = args.L_max, padding = args.type_padding,
                                                     padding_value=args.padding_value, padding_with_sequence = args.padding_with_sequence, 
-                                                    reverse_complement_seq=args.reverse_complement_seq, adaptors=args.adaptors)
+                                                     adaptors=args.adaptors, type_model = args.model_architecture)
 
         
         ##Print size of data
@@ -437,23 +441,25 @@ def main_training(args):
 
             ##From start of the model test data
             if epoch == 0: 
-                y_train_predicted, y_train_true, val_loss = evaluation_step(training_generator, model, criterion, optimizer, task = args.task)
+                y_train_predicted, y_train_true, val_loss = evaluation_step(training_generator, model, criterion, optimizer)
                 plot_pred_vs_true(y_train_true, y_train_predicted, output_folder, 
-                                                                title=f'Training_fold{i_fold}_epoch{epoch}', column_labels= args.column_labels)
+                                                                title=f'Training_fold{i_fold}_epoch{epoch}_without_training', column_labels= args.column_labels)
                 
 
             #Train model
             y_train_predicted, y_train_true, training_loss = training_step(training_generator, model, criterion, optimizer, scheduler=scheduler, betas = args.betas, 
-                                                                            gradient_clipping=args.gradient_clipping, task = args.task)
+                                                                            gradient_clipping=args.gradient_clipping)
 
             #Evaluate model
-            y_val_predicted, y_val_real, val_loss = evaluation_step(validation_generator, model, criterion, optimizer, task = args.task, type_data='Validation')
+            y_val_predicted, y_val_real, val_loss = evaluation_step(validation_generator, model, criterion, optimizer, type_data='Validation')
 
             loss_epoch_train.append(training_loss)
             loss_epoch_val.append(val_loss)
             
             #Save model and plot predictionss
-            epochs_to_motif = range(0, args.epochs+1, args.epochs//10)
+            if args.epochs >= 10: epochs_to_motif = range(0, args.epochs+1, args.epochs//10)
+            else: epochs_to_motif = range(0, args.epochs+1, 1)
+
             if epoch in epochs_to_motif or epoch == (args.epochs-1):
                 torch.save(model.state_dict(), os.path.join(output_folder, f'LB{today}_model_fold{i_fold}_epoch_{epoch}.pth'))
                 rvalue_train, pvalue = plot_pred_vs_true(y_train_true, y_train_predicted, output_folder, title=f'Training_fold{i_fold}_epoch{epoch}', column_labels= args.column_labels)
@@ -461,7 +467,7 @@ def main_training(args):
 
 
         #Plot of loss
-        plot_loss(epoch, loss_epoch_train, loss_epoch_val, output_folder, i_fold, today)
+        plot_loss(args.epochs, loss_epoch_train, loss_epoch_val, output_folder, i_fold, today)
 
         #Save loss
         corr_fold_train.append(float(rvalue_train))
@@ -475,8 +481,12 @@ def main_training(args):
     final_bar_plot(pd.DataFrame(data), output_folder, today)
 
     
-
 def call_main(args):
+    
+    if 'N' in args.adaptors[0] or args.adaptors[0] == 'false' or args.adaptors[0] == 'False' or args.adaptors[0] == 'none' or args.adaptors[0] == 'None':
+        args.adaptors = False
+        print(f'    - No adaptors will be used', flush=True)
+
     #Save data
     output_folder = os.path.join(args.output_folder, args.model_architecture)
     for trial in range(1000):
@@ -505,40 +515,8 @@ def call_main(args):
     main_training(args)
 
     sys.stdout.close()
-
-    
 
 if __name__ == '__main__':
 
-
-
     args = parse_args()
-
-    #Save data
-    output_folder = os.path.join(args.output_folder, args.model_architecture)
-    for trial in range(1000):
-        output_folder_current = os.path.join(output_folder, f'trial_{trial}')
-        if not os.path.exists(output_folder_current): 
-            output_folder = output_folder_current
-            break
-    
-    #Create folder and parents
-    os.makedirs(output_folder, exist_ok=True)
-
-    print(f'    - Output folder: {output_folder}', flush=True)
-    
-    with open(os.path.join(output_folder, 'log.txt'), 'w') as f:
-        f.write('Human sequences only')
-        for arg in vars(args):
-            f.write(f'        - {arg}: {getattr(args, arg)}\n')
-
-
-
-    #All printing messages will be saved in a log file
-    sys.stdout = open(os.path.join(output_folder, 'log_messages.txt'), 'w')
-    print(f'    - Output folder: {output_folder}', flush=True)
-    print(f'    - Log file: {os.path.join(output_folder, "log.txt")}', flush=True)
-
-    main_training(args)
-
-    sys.stdout.close()
+    call_main(args)

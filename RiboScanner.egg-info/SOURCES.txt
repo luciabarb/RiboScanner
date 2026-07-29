@@ -2,12 +2,14 @@ README.md
 setup.py
 RiboScanner/__init__.py
 RiboScanner/cli.py
+RiboScanner/evo2_regression.py
 RiboScanner/misc.py
 RiboScanner/predict_model.py
 RiboScanner/rrwick_help_formatter.py
 RiboScanner/train_model.py
 RiboScanner/utils_external_models.py
 RiboScanner/utils_model.py
+RiboScanner/utils_riboscanner_extensions.py
 RiboScanner/version.py
 RiboScanner.egg-info/PKG-INFO
 RiboScanner.egg-info/SOURCES.txt

@@ -512,6 +512,8 @@ def call_main(args):
     print(f'    - Output folder: {output_folder}', flush=True)
     print(f'    - Log file: {os.path.join(output_folder, "log.txt")}', flush=True)
 
+    args.output_folder = output_folder
+
     main_training(args)
 
     sys.stdout.close()

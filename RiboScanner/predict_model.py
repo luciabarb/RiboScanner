@@ -61,7 +61,8 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
                         # Evo2-specific
                         evo2_batch_size=32,
                         # Shared
-                        label_scaler_path=None, device='cuda', padding_with_sequence=False):
+                        label_scaler_path=None, device='cuda', padding_with_sequence=False,
+                        index_output=0, num_outputs=1):
     """
     This function will predict the output of a model(s) given a list of sequences.
     Args:
@@ -124,7 +125,7 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
             #print(f'Model {i_model}: {type(model)}', flush=True)
             model.eval()
             with torch.no_grad():
-                outputs = model(onehot).cpu().detach().numpy()
+                outputs = model(onehot).cpu().detach().numpy()[:, index_output]
                 pred_models.append(outputs)
             
             #print the first item of each value of the list
@@ -144,7 +145,7 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
 
 def predict_from_fasta(input_file, models, L_max, output_file = False,
                        store_variance=False, padding='left', padding_value=0, batch_size=2000, adaptors=False, verbose=False, header_only=False,
-                       model_type='MTtrans', padding_with_sequence=False):
+                       model_type='MTtrans', padding_with_sequence=False, index_output=0):
     """
     This function will predict the output of a model(s) given a fasta file with sequences.
     Args:
@@ -185,7 +186,7 @@ def predict_from_fasta(input_file, models, L_max, output_file = False,
         #Load each model
         loaded_models_list = []
         for model in models:
-            loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max)
+            loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max, output_size=num_outputs)
             if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
             loaded_model.eval()
             loaded_models_list.append(loaded_model)
@@ -221,7 +222,7 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
                            noderer_order='di', noderer_aug_col=None,
                            noderer_positions=None,
                            label_scaler_path=None, evo2_batch_size=32,
-                           evo2_regression_path=None, device='cuda', padding_with_sequence=False):
+                           evo2_regression_path=None, device='cuda', padding_with_sequence=False, index_output=0, num_outputs=1):
     """
     This function will predict the output of a model(s) given a dataframe with sequences.
     Args:
@@ -301,7 +302,7 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
         #Load each model
         loaded_models_list = []
         for model in models:
-            loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max)
+            loaded_model = load_model(model, model=model_type, train=False, verbose=verbose, L_max=L_max, output_size=num_outputs)
             if torch.cuda.is_available(): loaded_model = loaded_model.cuda()
             loaded_model.eval()
             loaded_models_list.append(loaded_model)
@@ -310,10 +311,12 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
         if store_variance: 
             predictions, variances = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, 
                                                     padding_value=padding_value, batch_size=batch_size, 
-                                                    variance_models = store_variance, adaptors=adaptors, model_type=model_type, padding_with_sequence=padding_with_sequence)
+                                                    variance_models = store_variance, adaptors=adaptors, model_type=model_type, padding_with_sequence=padding_with_sequence,
+                                                    index_output=index_output)
         else: 
             predictions = predict_from_seq(loaded_models_list, seqs, L_max, padding=padding, padding_value=padding_value, 
-                                        batch_size=batch_size, variance_models = store_variance, adaptors=adaptors, model_type=model_type, padding_with_sequence=padding_with_sequence)
+                                        batch_size=batch_size, variance_models = store_variance, adaptors=adaptors, model_type=model_type, padding_with_sequence=padding_with_sequence,
+                                        index_output=index_output)
 
     #Print the shape
     metadata[colum_pred_name] = predictions

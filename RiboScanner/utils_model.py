@@ -203,16 +203,12 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
         
         labels = np.array(dataframe_batch[self.column_labels], dtype=np.float32)
         #labels = np.array(np.exp2(labels)/1000, dtype=np.float32)
-        #print(f'   labels  {labels}\n\n', flush=True)
         if isinstance(labels, int): labels = np.array([labels])
-        #labels = torch.Tensor(labels)
 
+        
         #Print shape
         if onehot.shape[0] == 1: onehot = onehot[0]
         #print(f'onehot {onehot.shape} labels {labels}\n\n', flush=True)
-
-        
-        
         
         return onehot, labels
 
@@ -224,7 +220,7 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
 ####################################
 
 def load_model(  pretrained_model_file=None,
-                    train = True, strict= False, verbose=False, model=False, L_max=False):
+                    train = True, strict= False, verbose=False, model=False, L_max=False, output_size=1):
     """
     Load model depending on the name in the output_directory.
 
@@ -238,13 +234,14 @@ def load_model(  pretrained_model_file=None,
         strict: (Boolean) Only relevant if there's pretrained_directory. If weights are paseted in astrict way (it has to be the same exact model) or not.
         verbose: (Boolean) If we want to print information or not.
         model: (str) Model architecture to use. (default: MTtrans)
+        output_size: (int) Output size of the model. (default: 1)
 
     Return:
         model: pytorch model with initlaizied weights
     """
     #print(f'Loading model {model}... from {pretrained_model_file if pretrained_model_file else "random weights"}', flush=True)  
     if model == 'MTtrans': 
-        model = MTtrans()
+        model = MTtrans(output_size=output_size)
 
     elif model == 'GemoRNA': 
         from .utils_external_models import adapted_GemoRNA
@@ -294,7 +291,7 @@ def load_model(  pretrained_model_file=None,
             print(f'      Model weights loaded {pretrained_model_file}', flush=True)
 
     elif model == 'dense_layers':
-        model = simple_dense_model(input_size=4*L_max, hidden_sizes=[200, 70, 10], output_size=1)
+        model = simple_dense_model(input_size=4*L_max, hidden_sizes=[200, 70, 10], output_size=output_size)
 
     else: raise ValueError(f'Model architecture not recognised: {model}')
               
@@ -405,9 +402,8 @@ class simple_dense_model(nn.Module):
         x = x.reshape(x.size(0), -1)
         return self.model(x)
 
-
 class MTtrans(nn.Module):
-    def __init__(self):
+    def __init__(self, output_size=1):
         super().__init__()
 
         # Define conv_tower block directly within RL_hard_share
@@ -420,12 +416,20 @@ class MTtrans(nn.Module):
             activation='Mish'
         )
 
-        # Define task-specific towers with corrected naming
+        # Shared GRU trunk
         self.tower = torch.nn.ModuleList([
-                torch.nn.GRU(input_size=256, hidden_size=80, num_layers=2, batch_first=True),
-                torch.nn.Linear(80, 1)
+            torch.nn.GRU(input_size=256, hidden_size=80, num_layers=2, batch_first=True)
+        ])
+
+        self.output_size = output_size
+
+        if output_size == 1:
+            self.output = torch.nn.ModuleList([
+                torch.nn.Linear(80, output_size)
             ])
-    
+        else:
+            self.head_gfp = nn.Sequential(nn.Linear(80, 32), nn.Mish(), nn.Linear(32, 1))
+            self.head_ribo = nn.Sequential(nn.Linear(80, 32), nn.Mish(), nn.Linear(32, 1))
 
     def forward(self, x):
         # Pass through shared convolutional block
@@ -437,7 +441,56 @@ class MTtrans(nn.Module):
         # Process with GRU
         h_prim, _ = self.tower[0](z_t)
 
-        # Final task-specific output
-        out = self.tower[1](h_prim[:, -1, :])
+        # Take last timestep, shared representation
+        h_last = h_prim[:, -1, :]
+
+        if self.output_size == 1:
+            out = self.output[0](h_last)
+        else:
+            out_gfp = self.head_gfp(h_last)
+            out_ribo = self.head_ribo(h_last)
+            out = torch.cat([out_gfp, out_ribo], dim=1)  # shape (batch, 2)
+
         return out
 
+class WeightedMultiOutputMSELoss(nn.Module):
+    def __init__(self, weights = [1, 1]):
+        """
+        weights: 1D tensor/list of length n_outputs
+        """
+        super().__init__()
+        weights = torch.as_tensor(weights, dtype=torch.float32)
+        self.register_buffer("weights", weights)
+
+    def forward(self, outputs, targets, mask=None):
+        """
+        outputs, targets: shape (batch_size, n_outputs)
+        mask: optional, shape (batch_size, n_outputs). 1 where the target is
+            present/valid, 0 where missing (e.g. samples with a NaN label for
+            that head, already replaced with a dummy value such as 0 in
+            targets). If None, every element is treated as valid, matching
+            the old unmasked behaviour.
+
+        Returns:
+            total: scalar weighted loss, differentiable
+            per_output_loss: shape (n_outputs,), unweighted MSE per output,
+                useful for logging
+        """
+        # element-wise squared error, NOT reduced yet, so masking is applied
+        # before any averaging happens
+        sq_err = (outputs - targets) ** 2  # shape: (batch_size, n_outputs)
+        #print(f'sq_err {sq_err}')
+        if mask is None:
+            per_output_loss = sq_err.mean(dim=0)  # shape: (n_outputs,)
+        else:
+            mask = mask.float()
+            #print(f'mask {mask}')
+            masked_sq_err = sq_err * mask
+            #print(f'masked_sq_err {masked_sq_err}')
+            n_valid_per_output = mask.sum(dim=0).clamp(min=1)  # avoid /0 if a
+            #print(f'n_valid_per_output {n_valid_per_output}')
+            # whole batch is missing labels for one head
+            per_output_loss = masked_sq_err.sum(dim=0) / n_valid_per_output
+
+        total = (self.weights * per_output_loss).sum()
+        return total

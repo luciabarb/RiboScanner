@@ -104,7 +104,7 @@ def train_subparser(subparsers):
     required_args.add_argument("--output_folder", required=True, type=str,  help="Path to the directory to store all the output files.")
     
 
-    required_args.add_argument('--column_labels', required=True, type = str, help = 'Which column in the input file contains the measurement data. ')
+    required_args.add_argument('--column_labels', required=True, nargs="+", type = str, help = 'Which column in the input file contains the measurement data. ')
 
     required_args.add_argument('--column_sequences', required=True, type = str,  help = 'Which column in the input file contains the sequences.')
 
@@ -133,7 +133,9 @@ def train_subparser(subparsers):
     
     model_args.add_argument('--betas',  type=float, nargs='+', default = [0.05,0.05], help = 'Regularization terms, L1 and L2 respectively (default: [0.05,0.05])')
     
-    model_args.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss function (default: mse). Choose from mse or poisson', choices = ['mse', 'poisson'])
+    model_args.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss function (default: mse). Choose from mse or poisson', choices = ['mse', 'poisson', 'SmoothL1Loss'])
+
+    model_args.add_argument('--weight_loss', type = float, default =False, nargs = '+', help = 'Weight for the loss, if there are two outputs, provide two values, one for each output. Only used when criterion is mse')
     
     model_args.add_argument('--scheduler', type=bool, default=False, help = 'Use scheduler for the learning that changes lr (default: False)')
 
@@ -175,6 +177,7 @@ def train(args):
     print_arguments("Gradient clipping", args.gradient_clipping)
     print_arguments("Regularization terms (L1 and L2)", args.betas)
     print_arguments("Criterion for the loss function", args.criterion)
+    print_arguments("Weight for the loss function", args.weight_loss)
     print_arguments("Use scheduler for the learning that changes lr", args.scheduler)
     print_arguments("Type of padding", args.type_padding)
     print_arguments("Value for padding", args.padding_value)
@@ -255,6 +258,13 @@ def predict_subparser(subparsers):
             "'GemoRNA' = GemoRNA model. "
             "'framepool' = Framepool model. "
         ))
+    
+    model_args.add_argument("--num_outputs", type=int, default=1,
+        help=(
+            "Number of outputs for the model. Only used for the 'dense_layers', 'GemoRNA' and 'framepool' models. "
+            "(default: 1)"
+        )
+    )
 
     # ── Noderer-specific arguments ────────────────────────────────────────────
     noderer_args = group.add_argument_group(
@@ -377,6 +387,7 @@ def predict(args):
     print_arguments("Column with the measurements in the input dataframe", args.measurement_column)
     print_arguments("Split on variable column", args.split_on_variable)
     print_arguments("Verbose", args.verbose)
+    print_arguments("Number of outputs for the model", args.num_outputs)
     if args.model_type == 'noderer':
         print_arguments("Noderer PWM order", args.noderer_order)
         print_arguments("Noderer AUG column", args.noderer_aug_col)
@@ -422,7 +433,8 @@ def predict(args):
         evo2_regression_path=args.evo2_regression_path,
         device=device,
         padding=args.type_padding,
-        padding_with_sequence=args.padding_with_sequence
+        padding_with_sequence=args.padding_with_sequence,
+        num_outputs=args.num_outputs
         )
 
     else:
@@ -446,7 +458,8 @@ def predict(args):
         evo2_regression_path=args.evo2_regression_path,
         device=device,
         padding=args.type_padding,
-        padding_with_sequence=args.padding_with_sequence
+        padding_with_sequence=args.padding_with_sequence,
+        num_outputs=args.num_outputs
         )
 
 

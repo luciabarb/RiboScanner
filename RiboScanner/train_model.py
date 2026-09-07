@@ -519,6 +519,16 @@ def main_training(args):
             model.cuda()
             criterion.cuda()
         
+        """if args.scheduler:
+            steps_per_epoch = len(training_generator)
+            total_steps = args.epochs * steps_per_epoch
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=total_steps, eta_min=args.lr * 0.01, last_epoch=-1
+            )
+            print(f'NEW SCHEDUELER WITH FIX ED ETA_MIN {args.lr*0.01} and {total_steps} steps', flush=True)
+        else:
+            scheduler = False"""
+
         
         #Loop for epochs
         loss_epoch_train, loss_epoch_val = [], []
@@ -528,7 +538,8 @@ def main_training(args):
             #Define scheduler
             if args.scheduler:
                 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs*(len(training_set)/args.batch_size), eta_min= args.lr*0.1, last_epoch=-1)
-            
+
+
             else: scheduler = False
         
 

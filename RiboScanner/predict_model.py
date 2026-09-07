@@ -73,6 +73,14 @@ def predict_from_seq(models, seqs, L_max, padding='left', padding_value=0, batch
         padding_value: (int or float ) Value to pad with. (default: 0)
         variance_models: (bool) If true, store variance of the models and return it
     """
+
+    #If adaptors are N, N then set adaptors to False
+    if adaptors == ('N', 'N') or adaptors == ['N', 'N']:
+        adaptors = False
+        if adaptors == False: print(f'Adaptors set to {adaptors} because adaptors was set to ("N", "N")', flush=True)
+        elif adaptors == ('N', 'N'): print(f'Adaptors set to {adaptors} because adaptors was set to ("N", "N")', flush=True)
+        elif adaptors == ['N', 'N']: print(f'Adaptors set to {adaptors} because adaptors was set to ["N", "N"]', flush=True)
+
     # ── Noderer PWM ───────────────────────────────────────────────────────────
     if model_type == 'noderer':
         # models is already a loaded NodererPredictor
@@ -373,150 +381,162 @@ def predict_from_dataframe(input_file, models, column_sequences, L_max, output_f
         
 
             #Now check if the split_on_variable exists, and if so, check if it's in the metadata, and if so, make a scatter plot of the predictions vs the measurement but make column=5 and rows the remaining
+            metadata['length'] = metadata[column_sequences].apply(len)
+
             if split_on_variable and split_on_variable in metadata.columns:
-                #Take only the unique values that have at least 10 values
-                metadata_filtered = metadata.groupby(split_on_variable).filter(lambda x: len(x) >= 10)
-                unique_values = metadata_filtered[split_on_variable].unique()
-                #Order the unique values by the variance of the measurement column
-                unique_values = sorted(unique_values, key=lambda x: metadata[metadata[split_on_variable] == x][measurement_column].var())
-                #Reverse
-                unique_values = unique_values[::-1]
-                n_cols = 5 if len(unique_values) < 20 else 10
-                n_rows = int(np.ceil(len(unique_values) / n_cols))
-
-                size_fig_row = np.max([30, 5*n_rows])
-                
-                fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols*5, size_fig_row), sharex=True, sharey=True)
-                axes = axes.flatten()
-                corr_var = {}
-                for i, value in enumerate(unique_values):
-                    subset = metadata[metadata[split_on_variable] == value]
-                    r2_subset = np.corrcoef(subset[measurement_column], subset[colum_pred_name])[0, 1]
-                    var_measurement = subset[measurement_column].var()
-                    sns.scatterplot(x=subset[measurement_column], y=subset[colum_pred_name], ax=axes[i],
-                                    linewidth=0, alpha=1, color='black', s=50)
-                    axes[i].set_title(f'{split_on_variable}={value}, n={len(subset)}\n Measurements Var.={var_measurement:.2f}, Pearson r={r2_subset:.2f}')
-                    axes[i].set_xlabel(f'Measurement {measurement_column}')
-                    axes[i].set_ylabel('Predicted GFP scores')
-                    corr_var[value] = {'r2': r2_subset, 'var_measurement': var_measurement}
-                plt.tight_layout()
-                output_figure = extension_output_file + f'_scatter_{measurement_column}_vs_predictions_split_by_{split_on_variable}.png'
-                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
-
-                #Save the correlation and variance in a csv file
-                corr_var_df = pd.DataFrame.from_dict(corr_var, orient='index')
-                #Index to column
-                corr_var_df = corr_var_df.reset_index().rename(columns={'index': split_on_variable})
-                output_corr_var = extension_output_file + f'_correlation_variance_split_by_{split_on_variable}.txt'
-                corr_var_df.to_csv(output_corr_var, sep='\t', index=False)
-
-                #Make a barplot of all the correlations with the TIS in the x axis and the correlation in the y axis
-                #Make a heatmap on top but that it's way smaller in the y-axis (i.e. 2)
-                fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(max(20, len(unique_values)*0.5), 8), gridspec_kw={'height_ratios': [1, 5]})
-                sns.barplot(x=split_on_variable, y='r2', data=corr_var_df, ax=ax[1], color='lightgray')
-                #Rotate x ticks
-                ax[1].set_xticklabels(ax[1].get_xticklabels(), rotation=90)
-                ax[1].set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with the same {split_on_variable}')
-                ax[1].set_xlabel(f'{split_on_variable}')
-                #ax[1].set_title(f'Correlation between predicted GFP scores and measurements split by {split_on_variable}')
-                #Put the correlation value on top of each bar
-                for i, row in corr_var_df.iterrows():
-                    n = metadata[metadata[split_on_variable] == row[split_on_variable]].shape[0]
-                    ax[1].text(i, row['r2']*0.98, f"{row['r2']:.2f},\nn={n}", ha='center', va='bottom', fontsize=10)
-
-                #Add on top a heatmap that indicates 1) the number of sequences and 2) the variance of the measurements for each split_on_variable value
-                #Create a new axis on top of the barplot
-                ax2 = ax[0]
-                sns.heatmap(corr_var_df[['var_measurement']].T, ax=ax2, cmap='Reds', cbar=False, alpha=0.5, annot=corr_var_df[['var_measurement']].T, 
-                                fmt='.1f', annot_kws={'fontsize': 10})
-                ax2.set_xlabel('')
-                #Remove x ticks
-                ax2.set_xticks([])
-                ax2.set_yticks([])
-                ax2.set_ylabel('Measurement\n variance')
-
-                plt.tight_layout()
-                
-
-                output_figure = extension_output_file + f'_barplot_correlation_split_by_{split_on_variable}.png'
-                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
-
-
-                #Make also histogram of the correlation values
-                fig, ax = plt.subplots(figsize=(8, 5))
-                sns.histplot(corr_var_df['r2'], bins=20, ax=ax, color='lightgray', edgecolor='black')
-                ax.set_xlabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {split_on_variable}')
-                ax.set_ylabel('Count')
-                average = corr_var_df['r2'].mean()
-                #Put a line at the average value
-                ax.axvline(average, color='red', linestyle='--', label=f'Average Pearson\'s\nr={average:.2f}')
-                ax.legend(frameon=False, bbox_to_anchor=(1, 1))
-                ax.set_title(f'Histogram of correlation values \n split by {split_on_variable}')
-                plt.tight_layout()
-                output_figure = extension_output_file + f'_histogram_correlation_split_by_{split_on_variable}.png'
-                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
-
-                #Make a regression plot of the correlation vs the variance of the measurements
-                fig, ax = plt.subplots(figsize=(7, 5))
-                #Make line red and dots black
-                sns.regplot(x='var_measurement', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
-                ax.set_xlabel(f'Variance of measurements \n within sequences with same {split_on_variable}')
-                ax.set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {split_on_variable}')
-                ax.set_title(f'Correlation between measurement variance and correlation with predictions \n split by {split_on_variable}')
-                r2 = np.corrcoef(corr_var_df['var_measurement'], corr_var_df['r2'])[0, 1]
-                ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
-                plt.tight_layout()
-                output_figure = extension_output_file + f'_correlation_measurement_variance_split_by_{split_on_variable}.png'
-                plt.savefig(output_figure, dpi=300, bbox_inches='tight')    
-
-                #Now do the same by number of sequences
-                fig, ax = plt.subplots(figsize=(7, 5))
-                corr_var_df['n_sequences'] = corr_var_df[split_on_variable].apply(lambda x: metadata[metadata[split_on_variable] == x].shape[0])
-                sns.regplot(x='n_sequences', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
-                ax.set_xlabel(f'Number of sequences \n with same {split_on_variable}')
-                ax.set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {split_on_variable}')
-                ax.set_title(f'Correlation between number of sequences and correlation with predictions \n split by {split_on_variable}')
-                r2 = np.corrcoef(corr_var_df['n_sequences'], corr_var_df['r2'])[0, 1]
-                ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
-                plt.tight_layout()
-                output_figure = extension_output_file + f'_correlation_number_sequences_split_by_{split_on_variable}.png'
-                plt.savefig(output_figure, dpi=300, bbox_inches='tight')
-
-                #Now make AUC of variance cutoff vs. correlation
-                #For each model plot how the correlation gets better at different cutoffs of variance explained by the TIS
-                cutoffs = [0, 0.1, 0.5, 1, 2, 3, 5, 10]
-
-
-                cutoff_data = []
-                for cutoff in cutoffs:
-                    subset_data = corr_var_df[corr_var_df['var_measurement'] >= cutoff]
-                    print(f'Cutoff: {cutoff}, Number of data points: {len(subset_data)}')
+            
+                for variable_split in [split_on_variable, [split_on_variable, 'length']]:
+                    print(f'Variable split: {variable_split}', flush=True)
+                    if len(variable_split) == 2 and isinstance(variable_split, list):
+                        metadata_filtered[' '.join(variable_split)] = metadata_filtered[variable_split[0]].astype(str) + '_' + metadata_filtered[variable_split[1]].astype(str)
+                        variable_split = ' '.join(variable_split)
+        
+        
+                    #Take only the unique values that have at least 10 values
+                    metadata_filtered = metadata.groupby(variable_split).filter(lambda x: len(x) >= 10)
+        
+                    unique_values = metadata_filtered[variable_split].unique()
+                    #Order the unique values by the variance of the measurement column
+                    unique_values = sorted(unique_values, key=lambda x: metadata[metadata[variable_split] == x][measurement_column].var())
+                    #Reverse
+                    unique_values = unique_values[::-1]
+                    n_cols = 5 if len(unique_values) < 20 else 10
+                    n_rows = int(np.ceil(len(unique_values) / n_cols))
+        
+                    size_fig_row = np.max([30, 5*n_rows])
                     
-                    avg_r2 = subset_data[f'r2'].mean()
+                    #fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols*5, size_fig_row), sharex=True, sharey=True)
+                    #axes = axes.flatten()
+                    corr_var = {}
+                    for i, value in enumerate(unique_values):
+                        subset = metadata[metadata[variable_split] == value]
+                        r2_subset = np.corrcoef(subset[measurement_column], subset[colum_pred_name])[0, 1]
+                        var_measurement = subset[measurement_column].var()
+                        #sns.scatterplot(x=subset[measurement_column], y=subset[colum_pred_name], ax=axes[i],
+                        #                linewidth=0, alpha=1, color='black', s=50)
+                        #axes[i].set_title(f'{variable_split}={value}, n={len(subset)}\n Measurements Var.={var_measurement:.2f}, Pearson r={r2_subset:.2f}')
+                        #axes[i].set_xlabel(f'Measurement {measurement_column}')
+                        #axes[i].set_ylabel('Predicted GFP scores')
+                        corr_var[value] = {'r2': r2_subset, 'var_measurement': var_measurement}
+                    #plt.tight_layout()
+                    output_figure = extension_output_file + f'_scatter_{measurement_column}_vs_predictions_split_by_{"_".join(variable_split)}.png'
+                    #plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+        
+                    #Save the correlation and variance in a csv file
+                    corr_var_df = pd.DataFrame.from_dict(corr_var, orient='index')
+                    #Index to column
+                    corr_var_df = corr_var_df.reset_index().rename(columns={'index': variable_split})
+                    output_corr_var = extension_output_file + f'_correlation_variance_split_by_{variable_split}.txt'
+                    corr_var_df.to_csv(output_corr_var, sep='\t', index=False)
+        
+                    #Make a barplot of all the correlations with the TIS in the x axis and the correlation in the y axis
+                    #Make a heatmap on top but that it's way smaller in the y-axis (i.e. 2)
+                    fig, ax = plt.subplots(nrows=2, ncols=1, figsize=(max(20, len(unique_values)*0.5), 8), gridspec_kw={'height_ratios': [1, 5]})
+                    sns.barplot(x=variable_split, y='r2', data=corr_var_df, ax=ax[1], color='lightgray')
+                    #Rotate x ticks
+                    ax[1].set_xticklabels(ax[1].get_xticklabels(), rotation=90)
+                    ax[1].set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with the same {variable_split}')
+                    ax[1].set_xlabel(f'{variable_split}')
+                    #ax[1].set_title(f'Correlation between predicted GFP scores and measurements split by {split_on_variable}')
+                    #Put the correlation value on top of each bar
+                    for i, row in corr_var_df.iterrows():
+                        n = metadata[metadata[variable_split] == row[variable_split]].shape[0]
+                        ax[1].text(i, row['r2']*0.98, f"{row['r2']:.2f},\nn={n}", ha='center', va='bottom', fontsize=10)
+        
+                    #Add on top a heatmap that indicates 1) the number of sequences and 2) the variance of the measurements for each variable_split value
+                    #Create a new axis on top of the barplot
+                    ax2 = ax[0]
+                    sns.heatmap(corr_var_df[['var_measurement']].T, ax=ax2, cmap='Reds', cbar=False, alpha=0.5, annot=corr_var_df[['var_measurement']].T, 
+                                    fmt='.1f', annot_kws={'fontsize': 10})
+                    ax2.set_xlabel('')
+                    #Remove x ticks
+                    ax2.set_xticks([])
+                    ax2.set_yticks([])
+                    ax2.set_ylabel('Measurement\n variance')
+        
+                    plt.tight_layout()
+                    
+        
+                    output_figure = extension_output_file + f'_barplot_correlation_split_by_{variable_split}.png'
+                    plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+        
+        
+                    #Make also histogram of the correlation values
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    sns.histplot(corr_var_df['r2'], bins=20, ax=ax, color='lightgray', edgecolor='black')
+                    ax.set_xlabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {variable_split}')
+                    ax.set_ylabel('Count')
+                    average = corr_var_df['r2'].mean()
+                    #Put a line at the average value
+                    ax.axvline(average, color='red', linestyle='--', label=f'Average Pearson\'s\nr={average:.2f}')
+                    ax.legend(frameon=False, bbox_to_anchor=(1, 1))
+                    ax.set_title(f'Histogram of correlation values \n split by {variable_split}')
+                    plt.tight_layout()
+                    output_figure = extension_output_file + f'_histogram_correlation_split_by_{variable_split}.png'
+                    plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+        
+                    #Make a regression plot of the correlation vs the variance of the measurements
+                    fig, ax = plt.subplots(figsize=(7, 5))
+                    #Make line red and dots black
+                    sns.regplot(x='var_measurement', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
+                    ax.set_xlabel(f'Variance of measurements \n within sequences with same {variable_split}')
+                    ax.set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {variable_split}')
+                    ax.set_title(f'Correlation between measurement variance and correlation with predictions \n split by {variable_split}')
+                    r2 = np.corrcoef(corr_var_df['var_measurement'], corr_var_df['r2'])[0, 1]
+                    ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
+                    plt.tight_layout()
+                    output_figure = extension_output_file + f'_correlation_measurement_variance_split_by_{variable_split}.png'
+                    plt.savefig(output_figure, dpi=300, bbox_inches='tight')    
+        
+                    #Now do the same by number of sequences
+                    fig, ax = plt.subplots(figsize=(7, 5))
+                    corr_var_df['n_sequences'] = corr_var_df[variable_split].apply(lambda x: metadata[metadata[variable_split] == x].shape[0])
+                    sns.regplot(x='n_sequences', y='r2', data=corr_var_df, ax=ax, scatter_kws={'color': 'black'}, line_kws={'color': 'red'})
+                    ax.set_xlabel(f'Number of sequences \n with same {variable_split}')
+                    ax.set_ylabel(f'Pearson\'s r measurements vs predictions \n within sequences with same {variable_split}')
+                    ax.set_title(f'Correlation between number of sequences and correlation with predictions \n split by {variable_split}')
+                    r2 = np.corrcoef(corr_var_df['n_sequences'], corr_var_df['r2'])[0, 1]
+                    ax.text(0.05, 0.95, f'Pearson r={r2:.2f}', transform=ax.transAxes, ha='left', va='top', fontsize=10, color='red')
+                    plt.tight_layout()
+                    output_figure = extension_output_file + f'_correlation_number_sequences_split_by_{variable_split}.png'
+                    plt.savefig(output_figure, dpi=300, bbox_inches='tight')
+        
+                    #Now make AUC of variance cutoff vs. correlation
+                    #For each model plot how the correlation gets better at different cutoffs of variance explained by the TIS
+                    cutoffs = [0, 0.1, 0.5, 1, 2, 3, 5, 10]
+        
+        
+                    cutoff_data = []
+                    for cutoff in cutoffs:
+                        subset_data = corr_var_df[corr_var_df['var_measurement'] >= cutoff]
+                        print(f'Cutoff: {cutoff}, Number of data points: {len(subset_data)}')
                         
-                    cutoff_data.append({'cutoff': cutoff, 'r2': avg_r2})
-
-                cutoff_df = pd.DataFrame(cutoff_data)
-                print(f'Cutoff dataframe: \n{cutoff_df}', flush=True)
-
-                plt.figure(figsize=(7, 6))
-
-                #import from sklearn
-                #from sklearn.metrics import auc as sklearn_auc
-
-                #auc = sklearn_auc(cutoff_df['cutoff'], cutoff_df['r2'])
-                auc=np.nan
-                #print(f'AUC of correlation vs. measurement variance cutoff: {auc}', flush=True)
-
-                sns.lineplot(data=cutoff_df, x='cutoff', y=f'r2', marker='o', color='black')
-
-                #plt.title(f'Correlation vs. Measurement Variance Cutoff\nAUC={auc:.2f}')
-
-
-                plt.xlabel('Cutoff on Measurement Variance\nin sequences within same TIS')
-                plt.ylabel('Average Pearson\'s r \npredictions vs measurements')
-                plt.grid()
-                plt.savefig(extension_output_file + f'_correlation_vs_measurement_variance_cutoff_split_by_{split_on_variable}.png', dpi=300, bbox_inches='tight')
-
+                        avg_r2 = subset_data[f'r2'].mean()
+                            
+                        cutoff_data.append({'cutoff': cutoff, 'r2': avg_r2})
+        
+                    cutoff_df = pd.DataFrame(cutoff_data)
+                    print(f'Cutoff dataframe: \n{cutoff_df}', flush=True)
+        
+                    plt.figure(figsize=(7, 6))
+        
+                    #import from sklearn
+                    #from sklearn.metrics import auc as sklearn_auc
+        
+                    #auc = sklearn_auc(cutoff_df['cutoff'], cutoff_df['r2'])
+                    auc=np.nan
+                    #print(f'AUC of correlation vs. measurement variance cutoff: {auc}', flush=True)
+        
+                    sns.lineplot(data=cutoff_df, x='cutoff', y=f'r2', marker='o', color='black')
+        
+                    #plt.title(f'Correlation vs. Measurement Variance Cutoff\nAUC={auc:.2f}')
+        
+        
+                    plt.xlabel('Cutoff on Measurement Variance\nin sequences within same TIS')
+                    plt.ylabel('Average Pearson\'s r \npredictions vs measurements')
+                    plt.grid()
+                    plt.savefig(extension_output_file + f'_correlation_vs_measurement_variance_cutoff_split_by_{variable_split}.png', dpi=300, bbox_inches='tight')
+                    print(f'Saved in {extension_output_file + f"_correlation_vs_measurement_variance_cutoff_split_by_{variable_split}.png"} \n', flush=True)
+        
     return metadata
 

@@ -81,12 +81,12 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
                 seq = seq_left + seq + seq_right
                 diff, pw = 0, 0
             
-            elif padding == 'left':
+            elif padding == 'right':
                 seq_right = ''.join(random.choices(['A','C','G','T'], k=diff))
                 seq = seq + seq_right
                 diff, pw = 0, 0
             
-            elif padding == 'right':
+            elif padding == 'left':
                 seq_left = ''.join(random.choices(['A','C','G','T'], k=diff))
                 seq = seq_left + seq
                 diff, pw = 0, 0
@@ -336,6 +336,9 @@ def load_model(  pretrained_model_file=None,
         model_weights = torch.load(pretrained_model_file, map_location=torch.device('cpu'))
         
         if verbose: print(f'      Model weights loaded', flush=True, end=' ')
+        if output_size == 1 and 'MTtrans' in model_name:
+            #Remap old MTtrans state dict to new one
+            model_weights = remap_old_mttrans_state_dict(model_weights)
         missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict=True)
         if verbose: print('      Model weights pasted', flush=True)
         if verbose: print(f'\n      Missing keys {missing_keys}, \n      Unexpected keys {unexpected_keys}', flush=True)
@@ -349,6 +352,26 @@ def load_model(  pretrained_model_file=None,
     return(model)
 
 
+def remap_old_mttrans_state_dict(state_dict):
+    """
+    Old MTtrans checkpoints stored the output Linear layer as tower.1.*
+    (inside the shared ModuleList). New MTtrans (output_size=1) stores it
+    as output.0.*. This remaps old keys to the new naming so old
+    single-task checkpoints still load.
+    """
+    remapped = {}
+    for k, v in state_dict.items():
+        if k in ("tower.1.weight", "tower.1.bias"):
+            try: print(f'      Remapping key {k} to new MTtrans naming: {v.shape} {v[0]}', flush=True)
+            except: print(f'      Remapping key {k} to new MTtrans naming: {v.shape}', flush=True)
+
+            new_k = k.replace("tower.1.", "output.0.")
+            remapped[new_k] = v
+        else:
+            #try: print(f'      Keeping key {k} as is: {v.shape} {v[0]}', flush=True)
+            #except: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
+            remapped[k] = v
+    return remapped
 
 class Conv1d_block(nn.Module):
         def __init__(self, channel_ls, kernel_size, stride, padding_ls=None, diliation_ls=None, activation='ReLU'):
@@ -452,6 +475,8 @@ class MTtrans(nn.Module):
             out = torch.cat([out_gfp, out_ribo], dim=1)  # shape (batch, 2)
 
         return out
+
+
 
 class WeightedMultiOutputMSELoss(nn.Module):
     def __init__(self, weights = [1, 1]):

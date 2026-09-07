@@ -198,7 +198,7 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
 ####################################
 
 def load_model(  pretrained_model_file=None,
-                    train = True, strict= False, verbose=False, model=False):
+                    train = True, strict= False, verbose=False, model=False, L_max=False, output_size=1):
     """
     Load model depending on the name in the output_directory.
 
@@ -211,13 +211,71 @@ def load_model(  pretrained_model_file=None,
         train: (Boolean) If we are training the model or not.
         strict: (Boolean) Only relevant if there's pretrained_directory. If weights are paseted in astrict way (it has to be the same exact model) or not.
         verbose: (Boolean) If we want to print information or not.
+        model: (str) Model architecture to use. (default: MTtrans)
+        output_size: (int) Output size of the model. (default: 1)
 
     Return:
         model: pytorch model with initlaizied weights
     """
+    #print(f'Loading model {model}... from {pretrained_model_file if pretrained_model_file else "random weights"}', flush=True)  
+    if model == 'MTtrans': 
+        model = MTtrans(output_size=output_size)
 
-    model = MTtrans()
+    elif model == 'GemoRNA': 
+        from .utils_external_models import adapted_GemoRNA
+        pooling = 'mean'
+        freezing = False
+        print(f'     Initializing model {model} with pooling {pooling} and freezing {freezing}', flush=True)
+        model = adapted_GemoRNA(n_embd=144, n_head=12, dropout=0.1, bias=True, block_size=768, n_layer=12, vocab_size=512,
+                                            num_classes = 1,          # scalar regression
+                                            pooling     = pooling,
+                                            freeze_backbone = freezing,   # fine-tune head only
+                                        ) #n_layer, n_head can change
+
+        if pretrained_model_file and train:
+            model.load_pretrained_backbone(pretrained_model_file, device = 'cpu' if not torch.cuda.is_available() else 'cuda')
+                #Print which layers are frozen and which are not
+            for name, param in model.named_parameters():
+                freeze = False
+                if param.requires_grad and 'backbone' in name:
+                    param.requires_grad = freeze
+                    print(f'      Layer {name} is {freeze} frozen and will be trained', flush=True)
+                
+                elif not param.requires_grad:
+                    print(f'      Layer {name} is already frozen', flush=True)
+                else:
+                    print(f'      Layer {name} is not frozen and will be trained', flush=True)
+
+        elif not pretrained_model_file and train:
+            print(f'      No pretrained model file provided, initializing model with random weights', flush=True)
+
+            #Print which layers are frozen and which are not
+            for name, param in model.named_parameters():
+                if param.requires_grad:
+                    print(f'      Layer {name} is not frozen and will be trained', flush=True)
+                else:
+                    print(f'      Layer {name} is frozen and will not be trained', flush=True)
+    
+    elif model == 'framepool':
+        from .utils_external_models import create_frame_slice_model
+        model = create_frame_slice_model(
+            kernel_size=[7, 7, 7],
+            only_max_pool=False,
+            padding="same",
+            skip_connections="residual"
+        )
+        if pretrained_model_file and train:
+            model.load_state_dict(torch.load(pretrained_model_file, map_location=torch.device('cpu')), strict = strict)
+            print(f'      Model weights loaded {pretrained_model_file}', flush=True)
+
+    elif model == 'dense_layers':
+        model = simple_dense_model(input_size=4*L_max, hidden_sizes=[200, 70, 10], output_size=output_size)
+
+    else: raise ValueError(f'Model architecture not recognised: {model}')
               
+    #Print number of parameters
+    num_params = sum(p.numel() for p in model.parameters())
+    if verbose: print(f'      Model {model} initialized with {num_params} parameters', flush=True)
 
     #Get class name of the model
     model_name = model.__class__.__name__
@@ -225,13 +283,26 @@ def load_model(  pretrained_model_file=None,
     if train:
 
         if verbose: print(f'      Model {model_name} loaded, pretrained {pretrained_model_file}', flush=True)
+        if verbose: print(f'\n      Training mode\n', flush=True)
         if pretrained_model_file and 'leaky_scanning_LM_UTR' not in model_name: #Load weights if there's pretrained model
 
             if verbose: print(f'      Model weights loaded {pretrained_model_file}', flush=True)
             
             model_weights = torch.load(pretrained_model_file, map_location=torch.device('cpu'))
             
-            missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = strict)
+            if 'GemoRNA' in model_name and '.pth' in pretrained_model_file:
+                #from .pretrained_models.GEMORNA import config
+                #model_weights = torch.load(pretrained_model_file,  weights_only=False)['model']
+        
+                missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = False)
+                #For the matching weights, we load them and freeze them, for the non-matching weights, we keep them as they are and they will be trained
+                for name, param in model.named_parameters():
+                    if name in model_weights:
+                        print(f'      Loading weight {name} from pretrained model and freezing= {freeze}', flush=True)
+                        param.requires_grad = freeze
+
+            else:
+                missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict = strict)
             
 
             if verbose: print(f'      Missing keys {missing_keys}, \n      Unexpected keys {unexpected_keys}', flush=True)
@@ -241,27 +312,44 @@ def load_model(  pretrained_model_file=None,
         if not pretrained_model_file: raise ValueError(f'   Argument: [pretrained_model_file] is mandatory for validation')
 
         model_weights = torch.load(pretrained_model_file, map_location=torch.device('cpu'))
-        #Print the keys of the model weights
-        #print(f'      Model weights keys: {model_weights.keys()}', flush=True)
         
         if verbose: print(f'      Model weights loaded', flush=True, end=' ')
-        try:
-            missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict=True)
-            #print(f'Missing keys {missing_keys}, \n      Unexpected keys {unexpected_keys}', flush=True)
-        except Exception as e:
-            if verbose: print(f'      Error loading model weights: {e}. Are you sure its the right model?', flush=True)
-
+        if output_size == 1 and 'MTtrans' in model_name:
+            #Remap old MTtrans state dict to new one
+            model_weights = remap_old_mttrans_state_dict(model_weights)
+        missing_keys, unexpected_keys = model.load_state_dict(model_weights, strict=True)
         if verbose: print('      Model weights pasted', flush=True)
+        if verbose: print(f'\n      Missing keys {missing_keys}, \n      Unexpected keys {unexpected_keys}', flush=True)
 
         model.eval()
     
     if torch.cuda.is_available():
-            if verbose: print('      Model moved to GPU', flush=True)
+            if verbose: print('      Model moved to GPU\n', flush=True)
             model = model.cuda()
 
     return(model)
 
 
+def remap_old_mttrans_state_dict(state_dict):
+    """
+    Old MTtrans checkpoints stored the output Linear layer as tower.1.*
+    (inside the shared ModuleList). New MTtrans (output_size=1) stores it
+    as output.0.*. This remaps old keys to the new naming so old
+    single-task checkpoints still load.
+    """
+    remapped = {}
+    for k, v in state_dict.items():
+        if k in ("tower.1.weight", "tower.1.bias"):
+            try: print(f'      Remapping key {k} to new MTtrans naming: {v.shape} {v[0]}', flush=True)
+            except: print(f'      Remapping key {k} to new MTtrans naming: {v.shape}', flush=True)
+
+            new_k = k.replace("tower.1.", "output.0.")
+            remapped[new_k] = v
+        else:
+            #try: print(f'      Keeping key {k} as is: {v.shape} {v[0]}', flush=True)
+            #except: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
+            remapped[k] = v
+    return remapped
 
 class Conv1d_block(nn.Module):
         def __init__(self, channel_ls, kernel_size, stride, padding_ls=None, diliation_ls=None, activation='ReLU'):
@@ -293,9 +381,9 @@ class Conv1d_block(nn.Module):
             for block in self.encoder:
                 x = block(x)
             return x
-        
+
 class MTtrans(nn.Module):
-    def __init__(self):
+    def __init__(self, output_size=1):
         super().__init__()
 
         # Define conv_tower block directly within RL_hard_share
@@ -308,12 +396,20 @@ class MTtrans(nn.Module):
             activation='Mish'
         )
 
-        # Define task-specific towers with corrected naming
+        # Shared GRU trunk
         self.tower = torch.nn.ModuleList([
-                torch.nn.GRU(input_size=256, hidden_size=80, num_layers=2, batch_first=True),
-                torch.nn.Linear(80, 1)
+            torch.nn.GRU(input_size=256, hidden_size=80, num_layers=2, batch_first=True)
+        ])
+
+        self.output_size = output_size
+
+        if output_size == 1:
+            self.output = torch.nn.ModuleList([
+                torch.nn.Linear(80, output_size)
             ])
-    
+        else:
+            self.head_gfp = nn.Sequential(nn.Linear(80, 32), nn.Mish(), nn.Linear(32, 1))
+            self.head_ribo = nn.Sequential(nn.Linear(80, 32), nn.Mish(), nn.Linear(32, 1))
 
     def forward(self, x):
         # Pass through shared convolutional block
@@ -325,6 +421,14 @@ class MTtrans(nn.Module):
         # Process with GRU
         h_prim, _ = self.tower[0](z_t)
 
-        # Final task-specific output
-        out = self.tower[1](h_prim[:, -1, :])
+        # Take last timestep, shared representation
+        h_last = h_prim[:, -1, :]
+
+        if self.output_size == 1:
+            out = self.output[0](h_last)
+        else:
+            out_gfp = self.head_gfp(h_last)
+            out_ribo = self.head_ribo(h_last)
+            out = torch.cat([out_gfp, out_ribo], dim=1)  # shape (batch, 2)
+
         return out

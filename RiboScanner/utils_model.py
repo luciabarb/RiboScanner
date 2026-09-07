@@ -340,11 +340,11 @@ def remap_old_mttrans_state_dict(state_dict):
     remapped = {}
     for k, v in state_dict.items():
         if k in ("tower.1.weight", "tower.1.bias"):
-            
+            #print(f'      Remapping key {k} to new MTtrans naming: {v.shape}', flush=True)
             new_k = k.replace("tower.1.", "output.0.")
             remapped[new_k] = v
         else:
-            #try: print(f'      Keeping key {k} as is: {v.shape} {v[0]}', flush=True)
+            #try: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
             #except: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
             remapped[k] = v
     return remapped

@@ -7,7 +7,7 @@ import random
 
 ###DATA PROCESSING
 def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_sequence=False, return_reverse_complement=False, 
-                    add_kozak=False, adaptors=False, position_kozak=13):
+                    add_kozak=False, adaptors=False, position_kozak=13, relative_to_start_codon=False):
     """
     Transform list of sequences to one hot.
     Args:
@@ -45,13 +45,25 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
             
             elif isinstance(add_kozak, str):
                 seq = seq[:-position_kozak] + add_kozak + seq[-position_kozak:]
-            
+
+
         if adaptors:
             seq = adaptors[0] + seq + adaptors[1]
         
+        if relative_to_start_codon:
+            #Check where is the last AUG in the sequence
+            pos_sequence = seq.rfind('ATG')
+            #Then we add "N" until we reach to 130 bases after the last AUG
+            if pos_sequence == -1: extra_N = 'N' * 130
+            else: extra_N = 'N' * max(0, (130 - (len(seq) - pos_sequence) ))
+            seq = seq + extra_N
+            padding = 'left' #If we are adding N to the right, we have to pad on the left
+            #print(f'  Sequence after adding N: len {len(seq)} {seq}', flush=True)
+
         
-            
         diff = (L_max - len(seq))
+        #print(f' Sequence length: {len(seq)}, L_max: {L_max}, diff: {diff}', flush=True)
+        if L_max < len(seq): raise ValueError(f'Sequence length {len(seq)} is longer than L_max {L_max}. Diff {diff} seq {seq} \n Please increase L_max or remove adaptors/kozak sequence if you are adding them')
         pw = (L_max - len(seq))/2
 
         #If padding value is not 0, and it's a "random" then we will create a random sequence
@@ -59,28 +71,28 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
             if padding == 'random':
                 left_random = random.randint(0,diff)
                 right_random = diff - left_random
-                seq_left = ''.join(random.choices(['A','C','G','U'], k=left_random))
-                seq_right = ''.join(random.choices(['A','C','G','U'], k=right_random))
+                seq_left = ''.join(random.choices(['A','C','G','T'], k=left_random))
+                seq_right = ''.join(random.choices(['A','C','G','T'], k=right_random))
                 seq = seq_left + seq + seq_right
                 diff, pw = 0, 0
 
             elif padding == 'middle':
-                seq_left = ''.join(random.choices(['A','C','G','U'], k=int(np.ceil(pw))))
-                seq_right = ''.join(random.choices(['A','C','G','U'], k=int(np.floor(pw))))
+                seq_left = ''.join(random.choices(['A','C','G','T'], k=int(np.ceil(pw))))
+                seq_right = ''.join(random.choices(['A','C','G','T'], k=int(np.floor(pw))))
                 seq = seq_left + seq + seq_right
                 diff, pw = 0, 0
             
-            elif padding == 'left':
-                seq_right = ''.join(random.choices(['A','C','G','U'], k=diff))
+            elif padding == 'right':
+                seq_right = ''.join(random.choices(['A','C','G','T'], k=diff))
                 seq = seq + seq_right
                 diff, pw = 0, 0
             
-            elif padding == 'right':
-                seq_left = ''.join(random.choices(['A','C','G','U'], k=diff))
+            elif padding == 'left':
+                seq_left = ''.join(random.choices(['A','C','G','T'], k=diff))
                 seq = seq_left + seq
                 diff, pw = 0, 0
 
-        PW = [int(np.ceil(pw)),int(np.floor(pw))]
+        PW = [int(np.ceil(pw)), int(np.floor(pw))]
 
         x = np.array([letter2vector[s] for s in seq])
 
@@ -98,7 +110,9 @@ def getOneHot(Seqs, L_max, padding = 'random', padding_value=0, padding_with_seq
             X_OneHot.append( np.pad(x,[[0,diff],[0,0]], constant_values=padding_value) )
 
         elif padding == 'left':
+            #print(f'diff {diff}. x {x.shape}', flush=True)
             X_OneHot.append( np.pad(x, [[diff,0],[0,0]], constant_values=padding_value) )
+            #print(f'diff {diff}. x {x.shape}', flush=True)
 
         else:
             raise Exception(f'Padding option not recognised: {padding}')
@@ -137,7 +151,7 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
         same as desired Tensor type.
     """
     def __init__(self, pd_dataframe, column_labels, column_sequences, L_max, padding = 'left', padding_value=0, 
-                    padding_with_sequence=False, reverse_complement_seq=False, adaptors=False):
+                    padding_with_sequence=False, reverse_complement_seq=False, adaptors=False, type_model = 'MTtrans'):
         self.pd_dataframe = pd_dataframe
         self.column_labels = column_labels
         self.column_sequences = column_sequences
@@ -147,6 +161,7 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
         self.padding_with_sequence = padding_with_sequence
         self.reverse_complement_seq = reverse_complement_seq
         self.adaptors = adaptors
+        self.type_model = type_model
 
 
 
@@ -169,24 +184,32 @@ class dataset_batch_onehot(torch.utils.data.Dataset):
         
 
         #Now one hot encode
-        onehot = getOneHot(seqs, self.L_max, padding = self.padding, 
+        if self.type_model == 'GemoRNA':
+            from .utils_external_models import prepare_input
+            #Take five_prime_utr_vocab from utils_external_models
+            from .utils_external_models import five_prime_utr_vocab
+            onehot = prepare_input(seqs, vocab = five_prime_utr_vocab, pad_to=self.L_max)
+            #print(f' onehot{onehot} \n\n onehot {onehot.shape} \n\n', flush=True)  
+            onehot = torch.tensor(onehot)
+        
+        else:
+            onehot = getOneHot(seqs, self.L_max, padding = self.padding, 
                             padding_value=self.padding_value, padding_with_sequence=self.padding_with_sequence,
-                            return_reverse_complement=self.reverse_complement_seq, adaptors=self.adaptors)
-        onehot = torch.tensor(np.float32(onehot))
+                            return_reverse_complement=self.reverse_complement_seq, adaptors=self.adaptors,
+                            relative_to_start_codon = True if self.type_model == 'dense_layers' else False) 
+
+
+            onehot = torch.tensor(np.float32(onehot))
 
         
         labels = np.array(dataframe_batch[self.column_labels], dtype=np.float32)
         #labels = np.array(np.exp2(labels)/1000, dtype=np.float32)
-        #print(f'   labels  {labels}\n\n', flush=True)
         if isinstance(labels, int): labels = np.array([labels])
-        #labels = torch.Tensor(labels)
 
+        
         #Print shape
         if onehot.shape[0] == 1: onehot = onehot[0]
         #print(f'onehot {onehot.shape} labels {labels}\n\n', flush=True)
-
-        
-        
         
         return onehot, labels
 
@@ -340,11 +363,13 @@ def remap_old_mttrans_state_dict(state_dict):
     remapped = {}
     for k, v in state_dict.items():
         if k in ("tower.1.weight", "tower.1.bias"):
-            #print(f'      Remapping key {k} to new MTtrans naming: {v.shape}', flush=True)
+            #try: print(f'      Remapping key {k} to new MTtrans naming: {v.shape} {v[0]}', flush=True)
+            #except: print(f'      Remapping key {k} to new MTtrans naming: {v.shape}', flush=True)
+
             new_k = k.replace("tower.1.", "output.0.")
             remapped[new_k] = v
         else:
-            #try: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
+            #try: print(f'      Keeping key {k} as is: {v.shape} {v[0]}', flush=True)
             #except: print(f'      Keeping key {k} as is: {v.shape}', flush=True)
             remapped[k] = v
     return remapped
@@ -379,6 +404,27 @@ class Conv1d_block(nn.Module):
             for block in self.encoder:
                 x = block(x)
             return x
+
+class simple_dense_model(nn.Module):
+    def __init__(self, input_size, 
+                    hidden_sizes, output_size=1):
+        super().__init__()
+
+        layers = []
+        in_size = input_size
+        for hidden_size in hidden_sizes:
+            layers.append(nn.Linear(in_size, hidden_size))
+            layers.append(nn.ReLU())
+            in_size = hidden_size
+        layers.append(nn.Linear(in_size, output_size))
+
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        #Flatten the one hot encoding
+        #Flatten so it's shape (batch_size, input_size)
+        x = x.reshape(x.size(0), -1)
+        return self.model(x)
 
 class MTtrans(nn.Module):
     def __init__(self, output_size=1):
@@ -430,3 +476,47 @@ class MTtrans(nn.Module):
             out = torch.cat([out_gfp, out_ribo], dim=1)  # shape (batch, 2)
 
         return out
+
+
+
+class WeightedMultiOutputMSELoss(nn.Module):
+    def __init__(self, weights = [1, 1]):
+        """
+        weights: 1D tensor/list of length n_outputs
+        """
+        super().__init__()
+        weights = torch.as_tensor(weights, dtype=torch.float32)
+        self.register_buffer("weights", weights)
+
+    def forward(self, outputs, targets, mask=None):
+        """
+        outputs, targets: shape (batch_size, n_outputs)
+        mask: optional, shape (batch_size, n_outputs). 1 where the target is
+            present/valid, 0 where missing (e.g. samples with a NaN label for
+            that head, already replaced with a dummy value such as 0 in
+            targets). If None, every element is treated as valid, matching
+            the old unmasked behaviour.
+
+        Returns:
+            total: scalar weighted loss, differentiable
+            per_output_loss: shape (n_outputs,), unweighted MSE per output,
+                useful for logging
+        """
+        # element-wise squared error, NOT reduced yet, so masking is applied
+        # before any averaging happens
+        sq_err = (outputs - targets) ** 2  # shape: (batch_size, n_outputs)
+        #print(f'sq_err {sq_err}')
+        if mask is None:
+            per_output_loss = sq_err.mean(dim=0)  # shape: (n_outputs,)
+        else:
+            mask = mask.float()
+            #print(f'mask {mask}')
+            masked_sq_err = sq_err * mask
+            #print(f'masked_sq_err {masked_sq_err}')
+            n_valid_per_output = mask.sum(dim=0).clamp(min=1)  # avoid /0 if a
+            #print(f'n_valid_per_output {n_valid_per_output}')
+            # whole batch is missing labels for one head
+            per_output_loss = masked_sq_err.sum(dim=0) / n_valid_per_output
+
+        total = (self.weights * per_output_loss).sum()
+        return total

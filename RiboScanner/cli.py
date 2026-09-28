@@ -8,6 +8,7 @@ from .version import __version__
 from .misc import check_cuda
 import warnings
 import os
+import sys
 warnings.filterwarnings("ignore")
 
 
@@ -15,21 +16,21 @@ def main():
     global description
     description = (
         """
-
-    
-
-    ▗▄▄▖ ▄ ▗▖    ▄▄▄   ▗▄▄▖▗▞▀▘▗▞▀▜▌▄▄▄▄  ▄▄▄▄  ▗▞▀▚▖ ▄▄▄ 
-    ▐▌ ▐▌▄ ▐▌   █   █ ▐▌   ▝▚▄▖▝▚▄▟▌█   █ █   █ ▐▛▀▀▘█    
-    ▐▛▀▚▖█ ▐▛▀▚▖▀▄▄▄▀  ▝▀▚▖         █   █ █   █ ▝▚▄▄▖█    
-    ▐▌ ▐▌█ ▐▙▄▞▘      ▗▄▄▞▘                               
-                                                                                                     
-                                                        
- 
-    RiboScanner Model
-    Version: """
-            + __version__
-            + """
-    """
+        
+            
+        
+            ▗▄▄▖ ▄ ▗▖    ▄▄▄   ▗▄▄▖▗▞▀▘▗▞▀▜▌▄▄▄▄  ▄▄▄▄  ▗▞▀▚▖ ▄▄▄ 
+            ▐▌ ▐▌▄ ▐▌   █   █ ▐▌   ▝▚▄▖▝▚▄▟▌█   █ █   █ ▐▛▀▀▘█    
+            ▐▛▀▚▖█ ▐▛▀▚▖▀▄▄▄▀  ▝▀▚▖         █   █ █   █ ▝▚▄▄▖█    
+            ▐▌ ▐▌█ ▐▙▄▞▘      ▗▄▄▞▘                               
+                                                                                                             
+                                                                
+         
+            RiboScanner Model
+            Version: """
+                    + __version__
+                    + """
+            """
     )
 
     # Main parser ========================================================================
@@ -66,6 +67,7 @@ def main():
 
     if "func" in args:
         args.func(args)
+        sys.stdout = sys.__stdout__
         print(bye_message(), flush=True)
     else:
         parser.print_help()
@@ -102,7 +104,7 @@ def train_subparser(subparsers):
     required_args.add_argument("--output_folder", required=True, type=str,  help="Path to the directory to store all the output files.")
     
 
-    required_args.add_argument('--column_labels', required=True, type = str, help = 'Which column in the input file contains the measurement data. ')
+    required_args.add_argument('--column_labels', required=True, nargs="+", type = str, help = 'Which column in the input file contains the measurement data. ')
 
     required_args.add_argument('--column_sequences', required=True, type = str,  help = 'Which column in the input file contains the sequences.')
 
@@ -114,8 +116,8 @@ def train_subparser(subparsers):
 
 
     
-    model_args.add_argument('--model_architecture', type = str, default = 'leaky_scanning', help = 'Model architecture to use. (default: leaky_scanning)',
-                            choices = ['MTtrans'])
+    model_args.add_argument('--model_architecture', type = str, default = 'MTtrans', help = 'Model architecture to use. (default: MTtrans)',
+                            choices = ['MTtrans', 'dense_layers', 'GemoRNA', 'framepool'])
     
     model_args.add_argument('--model_input', type = str, default = None, help = 'Path to an existing model to continue training from. If not given, a new model will be trained from scratch. (default: None)')
 
@@ -131,7 +133,9 @@ def train_subparser(subparsers):
     
     model_args.add_argument('--betas',  type=float, nargs='+', default = [0.05,0.05], help = 'Regularization terms, L1 and L2 respectively (default: [0.05,0.05])')
     
-    model_args.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss function (default: mse). Choose from mse or poisson', choices = ['mse', 'poisson'])
+    model_args.add_argument('--criterion', type = str, default = 'mse', help = 'Criterion for the loss function (default: mse). Choose from mse or poisson', choices = ['mse', 'poisson', 'SmoothL1Loss'])
+
+    model_args.add_argument('--weight_loss', type = float, default =False, nargs = '+', help = 'Weight for the loss, if there are two outputs, provide two values, one for each output. Only used when criterion is mse')
     
     model_args.add_argument('--scheduler', type=bool, default=False, help = 'Use scheduler for the learning that changes lr (default: False)')
 
@@ -173,6 +177,7 @@ def train(args):
     print_arguments("Gradient clipping", args.gradient_clipping)
     print_arguments("Regularization terms (L1 and L2)", args.betas)
     print_arguments("Criterion for the loss function", args.criterion)
+    print_arguments("Weight for the loss function", args.weight_loss)
     print_arguments("Use scheduler for the learning that changes lr", args.scheduler)
     print_arguments("Type of padding", args.type_padding)
     print_arguments("Value for padding", args.padding_value)
@@ -186,78 +191,6 @@ def train(args):
 
 
 # Predict task =================================================================
-def predict_subparser(subparsers):
-
-    group = subparsers.add_parser(
-        "predict",
-        help="Predict promoter activity of sequences in data frame or fasta file using a trained RiboScanner model. "
-        "model. The output is a tab-separated file with the sequence and the "
-        "predicted score.",
-        formatter_class=MyHelpFormatter,
-        add_help=False,
-        description="R|" + description,
-    )
-
-    required_args = group.add_argument_group("Required arguments")
-
-    default_models = [
-    os.path.join(os.path.dirname(__file__), "pretrained_models", f"model_fold{i}_final.pth")
-    for i in range(10)]
-
-    required_args.add_argument( "--model", nargs="+", 
-        default=default_models,
-        help="Path(s) to the directory of the model. If you want to perform predictions "
-        "for the pre-trained RiboScanner_models, for instance, this should be "
-        "pre_trained_models/RiboScanner_models/. If you have trained your own model, "
-        "you should pass the path to the directory where the .pth files are stored. ",
-    )
-
-    required_args.add_argument( "--input", required=True, help="Path to the input fasta file or dataframe file that must contained a column with the sequences to be predicted." )
-
-    required_args.add_argument( "--column_sequence", default='sequence', type=str, help="Column name in the dataframe that contains the sequences to be predicted. "
-        "(default: sequence)."
-    )
-
-    required_args.add_argument( "--output", required=True, help="Path to the output file where the predictions will be saved. Output is a "
-        "tab-separated file with the sequence, header, and the predicted score."
-    )
-
-    required_args.add_argument(  "--n_seqs_per_batch", type=int, default=1,
-        help=" Number of sequences to predict simultaneously, increase only if your memory allows it. (Default: 1)"
-    )
-
-    required_args.add_argument(
-        "--header_only",  action = argparse.BooleanOptionalAction, default=False,
-        help="If this flag is set, the output file will not contain the sequences of the\n"
-                " input fasta. By default, RiboScanner model shows both the sequence and the header. (Default: False)"
-    )
-
-    ##########
-    other_args = group.add_argument_group("Other")
-
-
-    other_args.add_argument( "--L_max",  default=156, type=int, help="Max length of the sequence (default: 156)")
-
-
-    other_args.add_argument('--adaptors', type=str, nargs='+', default=['AGTGAACC', 'GGCGGCAG'], help='adaptors sequences, several can be given separated by space (default: [AGTGAACC, GGCGGCAG])')
-
-    other_args.add_argument(
-        "-h",
-        "--help",
-        action="help",
-        default=argparse.SUPPRESS,
-        help="Show this help message and exit",
-    )
-    other_args.add_argument(
-        "--version",
-        action="version",
-        version="RiboScanner model v" + __version__,
-        help="Show program's version number and exit",
-    )
-
-    group.set_defaults(func=predict)
-
-
 def predict_subparser(subparsers):
 
     group = subparsers.add_parser(
@@ -531,8 +464,8 @@ def predict(args):
 
 
 
-####
 
+####
 def bye_message():
     return (
         "\nAll done!\n"
